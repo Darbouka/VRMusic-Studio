@@ -10,9 +10,16 @@ import SwiftData
 
 @main
 struct StompCoinApp: App {
+    @StateObject private var appManager = AppManager.shared
+    
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            User.self,
+            Event.self,
+            EventParticipation.self,
+            Challenge.self,
+            Transaction.self,
+            Subscription.self
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -26,6 +33,10 @@ struct StompCoinApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(appManager)
+                .onAppear {
+                    appManager.initialize(modelContext: sharedModelContainer.mainContext)
+                }
         }
         .modelContainer(sharedModelContainer)
     }
