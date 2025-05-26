@@ -90,6 +90,10 @@ struct SettingsView: View {
     
     private let locationManager = CLLocationManager()
     
+    @State private var showingPrivacyPolicy = false
+    @State private var showingTermsOfService = false
+    @State private var showingAGB = false
+    
     var currentUser: User? {
         users.first
     }
@@ -286,12 +290,14 @@ struct SettingsView: View {
                 
                 // Rechtliches Sektion
                 Section("Rechtliches") {
-                    NavigationLink("Privacy Policy") {
-                        PrivacyPolicyView()
+                    Button(action: { showingPrivacyPolicy = true }) {
+                        Label("Datenschutzerklärung", systemImage: "hand.raised")
                     }
-                    
-                    NavigationLink("AGB und Datenschutzerklärung") {
-                        TermsAndConditionsView()
+                    Button(action: { showingAGB = true }) {
+                        Label("AGB", systemImage: "doc.text")
+                    }
+                    Button(action: { showingTermsOfService = true }) {
+                        Label("Nutzungsbedingungen", systemImage: "doc.plaintext")
                     }
                     
                     NavigationLink("Über Uns") {
@@ -432,6 +438,15 @@ struct SettingsView: View {
                 Button("OK", role: .cancel) { }
             } message: {
                 Text(syncError ?? "Ein unbekannter Fehler ist aufgetreten.")
+            }
+            .sheet(isPresented: $showingPrivacyPolicy) {
+                PrivacyPolicyView()
+            }
+            .sheet(isPresented: $showingTermsOfService) {
+                TermsOfServiceView()
+            }
+            .sheet(isPresented: $showingAGB) {
+                AGBView()
             }
         }
         .environmentObject(themeManager)
@@ -587,9 +602,48 @@ struct PrivacyPolicyView: View {
     }
 }
 
-struct TermsAndConditionsView: View {
+struct TermsOfServiceView: View {
     var body: some View {
-        Text("AGB und Datenschutzerklärung")
+        Text("Terms of Service")
+    }
+}
+
+struct AGBView: View {
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Allgemeine Geschäftsbedingungen (AGB)")
+                        .font(.title)
+                        .padding(.bottom)
+                    
+                    Group {
+                        Text("§1 Geltungsbereich")
+                            .font(.headline)
+                        Text("(1) Diese Allgemeinen Geschäftsbedingungen gelten für die Nutzung der StompCoin-App und aller damit verbundenen Dienste.\n\n(2) Abweichende Bedingungen des Nutzers werden nicht anerkannt, es sei denn, wir stimmen ihrer Geltung ausdrücklich zu.")
+                    }
+                    
+                    Group {
+                        Text("§2 Vertragsgegenstand")
+                            .font(.headline)
+                        Text("(1) StompCoin bietet eine mobile App an, die Fitness-Tracking mit Kryptowährung verbindet.\n\n(2) Die App ermöglicht es Nutzern:\n• Fitness-Aktivitäten zu tracken\n• StompCoins durch Bewegung zu verdienen\n• Kryptowährungen zu handeln\n• Soziale Interaktionen zu pflegen")
+                    }
+                    
+                    // Weitere Paragraphen hier...
+                    
+                    Group {
+                        Text("§13 Kontakt")
+                            .font(.headline)
+                        Text("StompCoin GmbH\nMusterstraße 123\n12345 Musterstadt\nDeutschland\n\nE-Mail: legal@stompcoin.com\nTelefon: +49 123 456789")
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("AGB")
+            .navigationBarItems(trailing: Button("Fertig") {
+                // Dismiss sheet
+            })
+        }
     }
 }
 

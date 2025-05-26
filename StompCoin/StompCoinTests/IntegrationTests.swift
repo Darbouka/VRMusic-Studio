@@ -6,6 +6,11 @@ class IntegrationTests: XCTestCase {
     var cacheManager: CacheManager!
     var syncManager: SyncManager!
     var paymentManager: PaymentManager!
+    var videoStreamingService: VideoStreamingService!
+    var userManager: UserManager!
+    var challengeService: ChallengeService!
+    var rewardsService: RewardsService!
+    var localizationService: LocalizationService!
     
     override func setUp() {
         super.setUp()
@@ -13,6 +18,11 @@ class IntegrationTests: XCTestCase {
         cacheManager = CacheManager.shared
         syncManager = SyncManager.shared
         paymentManager = PaymentManager.shared
+        videoStreamingService = VideoStreamingService.shared
+        userManager = UserManager.shared
+        challengeService = ChallengeService.shared
+        rewardsService = RewardsService.shared
+        localizationService = LocalizationService.shared
     }
     
     override func tearDown() {
@@ -20,6 +30,11 @@ class IntegrationTests: XCTestCase {
         cacheManager = nil
         syncManager = nil
         paymentManager = nil
+        videoStreamingService = nil
+        userManager = nil
+        challengeService = nil
+        rewardsService = nil
+        localizationService = nil
         super.tearDown()
     }
     
@@ -163,5 +178,167 @@ class IntegrationTests: XCTestCase {
         let cachedProfile = cacheManager.getCachedUserProfile()
         XCTAssertNotNil(cachedProfile)
         XCTAssertEqual(cachedProfile?.username, userProfile.username)
+    }
+    
+    // MARK: - Stream Integration Tests
+    
+    func testStreamingWithRewards() async throws {
+        // Benutzer erstellen
+        let user = createTestUser()
+        
+        // Challenge erstellen
+        let challenge = createTestChallenge()
+        
+        // Stream starten
+        try await videoStreamingService.startVideoStream(for: challenge)
+        
+        // Stomps hinzufügen
+        try await videoStreamingService.addStomps(1000, for: user.id)
+        
+        // Belohnungen berechnen
+        let rewards = try await rewardsService.calculateRewards(for: user.id, in: challenge)
+        
+        // Überprüfen
+        XCTAssertGreaterThan(rewards.stompCoins, 0)
+        XCTAssertGreaterThan(rewards.omCoins, 0)
+    }
+    
+    func testChallengeWithMultipleUsers() async throws {
+        // Benutzer erstellen
+        let users = (0..<5).map { _ in createTestUser() }
+        
+        // Challenge erstellen
+        let challenge = createTestChallenge()
+        
+        // Benutzer zur Challenge hinzufügen
+        for user in users {
+            try await challengeService.joinChallenge(challenge, user: user)
+        }
+        
+        // Stream für jeden Benutzer starten
+        for user in users {
+            try await videoStreamingService.startVideoStream(for: challenge)
+            try await videoStreamingService.addStomps(1000, for: user.id)
+        }
+        
+        // Challenge-Status überprüfen
+        let updatedChallenge = try await challengeService.getChallenge(id: challenge.id)
+        XCTAssertEqual(updatedChallenge.participants.count, users.count)
+    }
+    
+    func testPremiumFeatures() async throws {
+        // Premium-Benutzer erstellen
+        let premiumUser = createTestUser(isVIPPremium: true)
+        
+        // Challenge erstellen
+        let challenge = createTestChallenge()
+        
+        // Stream mit Premium-Features starten
+        try await videoStreamingService.startVideoStream(for: challenge)
+        try await videoStreamingService.addStomps(1000, for: premiumUser.id)
+        
+        // Premium-Belohnungen überprüfen
+        let rewards = try await rewardsService.calculateRewards(for: premiumUser.id, in: challenge)
+        XCTAssertGreaterThan(rewards.stompCoins, 1000)
+    }
+    
+    func testLocalizationIntegration() async throws {
+        // Sprachen testen
+        let languages = ["de", "en"]
+        
+        for language in languages {
+            // Sprache setzen
+            localizationService.setLanguage(language)
+            
+            // Challenge erstellen
+            let challenge = createTestChallenge()
+            
+            // Stream starten
+            try await videoStreamingService.startVideoStream(for: challenge)
+            
+            // Überprüfen
+            XCTAssertEqual(localizationService.currentLanguage, language)
+        }
+    }
+    
+    func testRewardsWithDifferentLevels() async throws {
+        // Benutzer mit verschiedenen Levels erstellen
+        let users = [
+            createTestUser(level: 1),
+            createTestUser(level: 5),
+            createTestUser(level: 10)
+        ]
+        
+        // Challenge erstellen
+        let challenge = createTestChallenge()
+        
+        // Stream für jeden Benutzer starten
+        for user in users {
+            try await videoStreamingService.startVideoStream(for: challenge)
+            try await videoStreamingService.addStomps(1000, for: user.id)
+            
+            // Belohnungen berechnen
+            let rewards = try await rewardsService.calculateRewards(for: user.id, in: challenge)
+            
+            // Überprüfen
+            XCTAssertGreaterThan(rewards.stompCoins, 0)
+            XCTAssertGreaterThan(rewards.omCoins, 0)
+        }
+    }
+    
+    func testConcurrentStreams() async throws {
+        // Benutzer erstellen
+        let users = (0..<3).map { _ in createTestUser() }
+        
+        // Challenge erstellen
+        let challenge = createTestChallenge()
+        
+        // Gleichzeitige Streams starten
+        async let streams = users.map { user in
+            try await videoStreamingService.startVideoStream(for: challenge)
+            try await videoStreamingService.addStomps(1000, for: user.id)
+        }
+        
+        // Warten auf alle Streams
+        try await streams
+        
+        // Überprüfen
+        let updatedChallenge = try await challengeService.getChallenge(id: challenge.id)
+        XCTAssertEqual(updatedChallenge.participants.count, users.count)
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func createTestUser(level: Int = 1, isVIPPremium: Bool = false) -> UserManager.User {
+        return UserManager.User(
+            id: UUID(),
+            username: "Test User",
+            email: "test@example.com",
+            level: level,
+            tokens: 100,
+            stompCoins: 100,
+            isVIPPremium: isVIPPremium,
+            isDeveloper: false,
+            vipPremiumGrantedBy: nil,
+            vipPremiumGrantDate: nil,
+            isDeveloperVIPPremium: false
+        )
+    }
+    
+    private func createTestChallenge() -> ChallengeService.Challenge {
+        return ChallengeService.Challenge(
+            id: UUID(),
+            title: "Test Challenge",
+            description: "Test Description",
+            eventId: UUID(),
+            startDate: Date(),
+            endDate: Calendar.current.date(byAdding: .day, value: 7, to: Date())!,
+            requiredTokens: 100,
+            requiredStompCoins: 200,
+            participants: [],
+            confirmedParticipants: [],
+            status: .active,
+            type: .event
+        )
     }
 } 
