@@ -2,38 +2,170 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
+const mongoose = require('mongoose');
+const Redis = require('ioredis');
+const cluster = require('cluster');
+const os = require('os');
 
-const app = express();
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
-
-// Speicher für aktive Streams und Verbindungen
-const activeStreams = new Map();
-const connections = new Map();
-
-// WebSocket-Verbindungshandler
-wss.on('connection', (ws) => {
-    const connectionId = uuidv4();
-    connections.set(connectionId, ws);
-    
-    console.log(`Neue Verbindung: ${connectionId}`);
-    
-    // Nachrichten-Handler
-    ws.on('message', async (message) => {
-        try {
-            const data = JSON.parse(message);
-            handleMessage(connectionId, data);
-        } catch (error) {
-            console.error('Fehler beim Verarbeiten der Nachricht:', error);
-            sendError(ws, 'Ungültige Nachricht');
-        }
-    });
-    
-    // Verbindungsabbruch-Handler
-    ws.on('close', () => {
-        handleDisconnect(connectionId);
-    });
+// Redis-Client für Caching
+const redis = new Redis({
+    host: process.env.REDIS_HOST || 'localhost',
+    port: process.env.REDIS_PORT || 6379,
+    password: process.env.REDIS_PASSWORD,
+    maxRetriesPerRequest: 3
 });
+
+// MongoDB-Verbindung
+mongoose.connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    maxPoolSize: 50,
+    minPoolSize: 10,
+    socketTimeoutMS: 45000,
+    keepAlive: true
+});
+
+// Cluster-Konfiguration für horizontale Skalierung
+if (cluster.isMaster) {
+    const numCPUs = os.cpus().length;
+    console.log(`Master-Prozess ${process.pid} läuft`);
+
+    // Worker-Prozesse starten
+    for (let i = 0; i < numCPUs; i++) {
+        cluster.fork();
+    }
+
+    cluster.on('exit', (worker, code, signal) => {
+        console.log(`Worker ${worker.process.pid} beendet`);
+        cluster.fork(); // Neuen Worker starten
+    });
+} else {
+    const app = express();
+    const server = http.createServer(app);
+    const wss = new WebSocket.Server({ server });
+
+    // Speicher für aktive Streams und Verbindungen
+    const activeStreams = new Map();
+    const connections = new Map();
+
+    // Rate Limiting
+    const rateLimit = require('express-rate-limit');
+    const limiter = rateLimit({
+        windowMs: 15 * 60 * 1000, // 15 Minuten
+        max: 100 // Limit pro IP
+    });
+    app.use(limiter);
+
+    // Body Parser
+    app.use(express.json({ limit: '50mb' }));
+    app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+    // CORS
+    app.use((req, res, next) => {
+        res.header('Access-Control-Allow-Origin', '*');
+        res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+        next();
+    });
+
+    // WebSocket-Verbindungshandler
+    wss.on('connection', (ws) => {
+        const connectionId = uuidv4();
+        connections.set(connectionId, ws);
+        
+        console.log(`Neue Verbindung: ${connectionId}`);
+        
+        // Nachrichten-Handler
+        ws.on('message', async (message) => {
+            try {
+                const data = JSON.parse(message);
+                await handleMessage(connectionId, data);
+            } catch (error) {
+                console.error('Fehler beim Verarbeiten der Nachricht:', error);
+                sendError(ws, 'Ungültige Nachricht');
+            }
+        });
+        
+        // Verbindungsabbruch-Handler
+        ws.on('close', () => {
+            handleDisconnect(connectionId);
+        });
+    });
+
+    // Datenverarbeitungs-Funktionen
+    async function processFitnessData(data) {
+        try {
+            // Daten in Redis zwischenspeichern
+            await redis.setex(`fitness:${data.userId}:${data.timestamp}`, 3600, JSON.stringify(data));
+            
+            // Daten in MongoDB speichern
+            await FitnessData.create(data);
+            
+            // Batch-Verarbeitung für Statistiken
+            await updateUserStats(data.userId);
+        } catch (error) {
+            console.error('Fehler bei der Fitness-Datenverarbeitung:', error);
+            throw error;
+        }
+    }
+
+    async function processTransactionData(data) {
+        try {
+            // Transaktion in Redis zwischenspeichern
+            await redis.setex(`transaction:${data.id}`, 3600, JSON.stringify(data));
+            
+            // Transaktion in MongoDB speichern
+            await Transaction.create(data);
+            
+            // Wallet-Salden aktualisieren
+            await updateWalletBalances(data);
+        } catch (error) {
+            console.error('Fehler bei der Transaktionsverarbeitung:', error);
+            throw error;
+        }
+    }
+
+    async function processSocialData(data) {
+        try {
+            // Social-Daten in Redis zwischenspeichern
+            await redis.setex(`social:${data.id}`, 3600, JSON.stringify(data));
+            
+            // Social-Daten in MongoDB speichern
+            await SocialData.create(data);
+            
+            // Benachrichtigungen senden
+            await sendNotifications(data);
+        } catch (error) {
+            console.error('Fehler bei der Social-Datenverarbeitung:', error);
+            throw error;
+        }
+    }
+
+    // Batch-Verarbeitung
+    async function processBatchData(dataArray, type) {
+        const batchSize = 1000;
+        for (let i = 0; i < dataArray.length; i += batchSize) {
+            const batch = dataArray.slice(i, i + batchSize);
+            await Promise.all(batch.map(data => {
+                switch (type) {
+                    case 'fitness':
+                        return processFitnessData(data);
+                    case 'transaction':
+                        return processTransactionData(data);
+                    case 'social':
+                        return processSocialData(data);
+                    default:
+                        throw new Error('Unbekannter Datentyp');
+                }
+            }));
+        }
+    }
+
+    // Server starten
+    const PORT = process.env.PORT || 3000;
+    server.listen(PORT, () => {
+        console.log(`Worker ${process.pid} läuft auf Port ${PORT}`);
+    });
+}
 
 // Nachrichtenverarbeitung
 function handleMessage(connectionId, message) {
@@ -261,14 +393,18 @@ function sendMessage(ws, message) {
 }
 
 function sendError(ws, error) {
-    sendMessage(ws, {
-        type: 'error',
-        error
-    });
+    if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'error', message: error }));
+    }
 }
 
-// Server starten
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`Server läuft auf Port ${PORT}`);
+// Fehlerbehandlung
+process.on('uncaughtException', (error) => {
+    console.error('Unbehandelter Fehler:', error);
+    // Fehler protokollieren und ggf. Benachrichtigung senden
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unbehandelte Promise-Ablehnung:', reason);
+    // Fehler protokollieren und ggf. Benachrichtigung senden
 }); 

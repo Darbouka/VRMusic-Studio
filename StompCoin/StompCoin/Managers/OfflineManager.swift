@@ -145,30 +145,84 @@ class OfflineManager {
     }
     
     private func loadUnsyncedFitnessData() throws -> [FitnessData] {
-        // Implementierung zum Laden nicht synchronisierter Fitness-Daten
-        return []
+        let descriptor = FetchDescriptor<FitnessData>(
+            predicate: #Predicate<FitnessData> { !$0.isSynced }
+        )
+        return try modelContext.fetch(descriptor)
     }
     
     private func loadUnsyncedTransactions() throws -> [Transaction] {
-        // Implementierung zum Laden nicht synchronisierter Transaktionen
-        return []
+        let descriptor = FetchDescriptor<Transaction>(
+            predicate: #Predicate<Transaction> { !$0.isSynced }
+        )
+        return try modelContext.fetch(descriptor)
     }
     
     private func loadUnsyncedSocialData() throws -> [SocialData] {
-        // Implementierung zum Laden nicht synchronisierter Social-Daten
-        return []
+        let descriptor = FetchDescriptor<SocialData>(
+            predicate: #Predicate<SocialData> { !$0.isSynced }
+        )
+        return try modelContext.fetch(descriptor)
     }
     
     private func syncFitnessData(_ data: FitnessData) async throws {
-        // Implementierung der Fitness-Daten-Synchronisierung
+        let endpoint = "\(Config.apiBaseURL)/fitness/steps"
+        var request = URLRequest(url: URL(string: endpoint)!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let encoder = JSONEncoder()
+        request.httpBody = try encoder.encode(data)
+        
+        let (_, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw SyncError.syncFailed
+        }
+        
+        data.isSynced = true
+        try modelContext.save()
     }
     
     private func syncTransaction(_ transaction: Transaction) async throws {
-        // Implementierung der Transaktions-Synchronisierung
+        let endpoint = "\(Config.apiBaseURL)/wallets/transactions"
+        var request = URLRequest(url: URL(string: endpoint)!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let encoder = JSONEncoder()
+        request.httpBody = try encoder.encode(transaction)
+        
+        let (_, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw SyncError.syncFailed
+        }
+        
+        transaction.isSynced = true
+        try modelContext.save()
     }
     
     private func syncSocialData(_ data: SocialData) async throws {
-        // Implementierung der Social-Daten-Synchronisierung
+        let endpoint = "\(Config.apiBaseURL)/social/\(data.type.rawValue)"
+        var request = URLRequest(url: URL(string: endpoint)!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let encoder = JSONEncoder()
+        request.httpBody = try encoder.encode(data)
+        
+        let (_, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw SyncError.syncFailed
+        }
+        
+        data.isSynced = true
+        try modelContext.save()
     }
 }
 

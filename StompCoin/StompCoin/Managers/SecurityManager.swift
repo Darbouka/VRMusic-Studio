@@ -12,27 +12,60 @@ class SecurityManager {
     
     // MARK: - Zwei-Faktor-Authentifizierung
     
-    func setupTwoFactor(for user: User) async throws {
-        // Hier würde die 2FA-Einrichtung implementiert
+    func setupTwoFactor(for user: User) async throws -> Data {
+        // 2FA-Schlüssel generieren
+        let secret = generateTOTPSecret()
+        
+        // QR-Code generieren
+        let qrCode = try generateTOTPQRCode(secret: secret, user: user)
+        
+        // 2FA-Daten speichern
+        try await save2FASecret(secret, for: user)
+        
+        // QR-Code zurückgeben
+        return qrCode
     }
     
     func verifyTwoFactor(code: String, for user: User) async throws -> Bool {
-        // Hier würde die 2FA-Verifizierung implementiert
-        return true
+        guard let secret = try await get2FASecret(for: user) else {
+            throw SecurityError.twoFactorNotSetup
+        }
+        
+        return try validateTOTPCode(code, secret: secret)
+    }
+    
+    private func generateTOTPSecret() -> String {
+        let bytes = [UInt8](repeating: 0, count: 20)
+        return Data(bytes).base64EncodedString()
+    }
+    
+    private func generateTOTPQRCode(secret: String, user: User) throws -> Data {
+        let otpauth = "otpauth://totp/StompCoin:\(user.email)?secret=\(secret)&issuer=StompCoin"
+        return try generateQRCode(from: otpauth)
     }
     
     // MARK: - Verschlüsselung
     
     func encryptData(_ data: Data) throws -> Data {
-        let key = SymmetricKey(size: .bits256)
+        let key = try getEncryptionKey()
         let sealedBox = try AES.GCM.seal(data, using: key)
         return sealedBox.combined ?? Data()
     }
     
     func decryptData(_ data: Data) throws -> Data {
-        let key = SymmetricKey(size: .bits256)
+        let key = try getEncryptionKey()
         let sealedBox = try AES.GCM.SealedBox(combined: data)
         return try AES.GCM.open(sealedBox, using: key)
+    }
+    
+    private func getEncryptionKey() throws -> SymmetricKey {
+        if let keyData = keychain.data(forKey: "encryptionKey") {
+            return SymmetricKey(data: keyData)
+        }
+        
+        let key = SymmetricKey(size: .bits256)
+        try keychain.set(key.withUnsafeBytes { Data($0) }, forKey: "encryptionKey")
+        return key
     }
     
     // MARK: - Biometrische Authentifizierung
@@ -76,8 +109,39 @@ class SecurityManager {
     // MARK: - Betrugsprävention
     
     func detectFraudulentActivity(for user: User) async throws -> [FraudAlert] {
-        // Hier würde die Betrugserkennung implementiert
-        return []
+        var alerts: [FraudAlert] = []
+        
+        // Ungewöhnliche Aktivitätsmuster prüfen
+        if let activityAlerts = try await checkActivityPatterns(for: user) {
+            alerts.append(contentsOf: activityAlerts)
+        }
+        
+        // Transaktionsanomalien prüfen
+        if let transactionAlerts = try await checkTransactionAnomalies(for: user) {
+            alerts.append(contentsOf: transactionAlerts)
+        }
+        
+        // Multi-Account-Prüfung
+        if let multiAccountAlerts = try await checkMultiAccountActivity(for: user) {
+            alerts.append(contentsOf: multiAccountAlerts)
+        }
+        
+        return alerts
+    }
+    
+    private func checkActivityPatterns(for user: User) async throws -> [FraudAlert]? {
+        // Implementierung der Aktivitätsmuster-Prüfung
+        return nil
+    }
+    
+    private func checkTransactionAnomalies(for user: User) async throws -> [FraudAlert]? {
+        // Implementierung der Transaktionsanomalien-Prüfung
+        return nil
+    }
+    
+    private func checkMultiAccountActivity(for user: User) async throws -> [FraudAlert]? {
+        // Implementierung der Multi-Account-Prüfung
+        return nil
     }
     
     func reportFraudulentActivity(
@@ -167,4 +231,5 @@ enum SecurityError: Error {
     case decryptionFailed
     case invalidData
     case permissionDenied
+    case twoFactorNotSetup
 } 

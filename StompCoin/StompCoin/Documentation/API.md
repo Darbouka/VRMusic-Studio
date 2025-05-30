@@ -1,7 +1,7 @@
-# StompCoin API Dokumentation
+# Stomp Coin API Dokumentation
 
-## Überblick
-Die StompCoin API ermöglicht die Interaktion mit der StompCoin-Plattform. Sie bietet Endpunkte für Benutzerverwaltung, Wallet-Operationen, Fitness-Tracking, soziale Funktionen und Trading.
+## Übersicht
+Die Stomp Coin API ermöglicht die Integration von Fitness-Tracking, Kryptowährung und sozialen Funktionen in Ihre Anwendung.
 
 ## Basis-URL
 ```
@@ -9,8 +9,7 @@ https://api.stompcoin.com/v1
 ```
 
 ## Authentifizierung
-Alle API-Anfragen müssen mit einem gültigen API-Token authentifiziert werden. Das Token muss im `Authorization`-Header mitgeführt werden:
-
+Alle API-Anfragen müssen mit einem gültigen API-Token authentifiziert werden:
 ```
 Authorization: Bearer <your-api-token>
 ```
@@ -27,23 +26,13 @@ POST /users/register
 **Request Body:**
 ```json
 {
-    "username": "string",
     "email": "string",
-    "password": "string"
+    "password": "string",
+    "username": "string"
 }
 ```
 
-**Response:**
-```json
-{
-    "id": "uuid",
-    "username": "string",
-    "email": "string",
-    "createdAt": "datetime"
-}
-```
-
-#### Anmeldung
+#### Login
 ```http
 POST /users/login
 ```
@@ -53,55 +42,6 @@ POST /users/login
 {
     "email": "string",
     "password": "string"
-}
-```
-
-**Response:**
-```json
-{
-    "token": "string",
-    "user": {
-        "id": "uuid",
-        "username": "string",
-        "email": "string"
-    }
-}
-```
-
-### Wallet
-
-#### Wallet-Informationen abrufen
-```http
-GET /wallets/{id}
-```
-
-**Response:**
-```json
-{
-    "id": "uuid",
-    "balance": "number",
-    "transactions": [
-        {
-            "id": "uuid",
-            "amount": "number",
-            "type": "string",
-            "date": "datetime"
-        }
-    ]
-}
-```
-
-#### Transaktion erstellen
-```http
-POST /wallets/{id}/transactions
-```
-
-**Request Body:**
-```json
-{
-    "amount": "number",
-    "type": "string",
-    "description": "string"
 }
 ```
 
@@ -116,28 +56,45 @@ POST /fitness/steps
 ```json
 {
     "steps": "number",
-    "date": "datetime"
+    "timestamp": "string",
+    "deviceId": "string"
 }
 ```
 
-#### Statistiken abrufen
+#### Fitness-Statistiken
 ```http
 GET /fitness/stats
 ```
 
-**Response:**
+**Query Parameter:**
+- `startDate`: Startdatum (ISO 8601)
+- `endDate`: Enddatum (ISO 8601)
+- `type`: Statistiktyp (daily, weekly, monthly)
+
+### Wallet
+
+#### Wallet-Informationen
+```http
+GET /wallets/:id
+```
+
+#### Transaktionen
+```http
+POST /wallets/:id/transactions
+```
+
+**Request Body:**
 ```json
 {
-    "steps": "number",
-    "caloriesBurned": "number",
-    "distance": "number",
-    "activeMinutes": "number"
+    "amount": "number",
+    "type": "string",
+    "description": "string"
 }
 ```
 
 ### Social
 
-#### Freund hinzufügen
+#### Freunde
 ```http
 POST /social/friends
 ```
@@ -150,21 +107,17 @@ POST /social/friends
 }
 ```
 
-#### Freunde abrufen
+#### Gruppen
 ```http
-GET /social/friends
+POST /social/groups
 ```
 
-**Response:**
+**Request Body:**
 ```json
 {
-    "friends": [
-        {
-            "id": "uuid",
-            "username": "string",
-            "status": "string"
-        }
-    ]
+    "name": "string",
+    "description": "string",
+    "members": ["uuid"]
 }
 ```
 
@@ -185,7 +138,7 @@ POST /trading/trades
 }
 ```
 
-#### Mining starten
+#### Mining
 ```http
 POST /trading/mining
 ```
@@ -218,7 +171,46 @@ Die API verwendet Semantische Versionierung. Die aktuelle Version ist in der URL
 https://api.stompcoin.com/v1
 ```
 
+## WebSocket API
+
+### Verbindung
+```
+wss://api.stompcoin.com/v1/ws
+```
+
+### Nachrichten
+
+#### Fitness-Updates
+```json
+{
+    "type": "fitness_update",
+    "data": {
+        "steps": "number",
+        "calories": "number",
+        "distance": "number"
+    }
+}
+```
+
+#### Trading-Updates
+```json
+{
+    "type": "trading_update",
+    "data": {
+        "price": "number",
+        "volume": "number",
+        "change": "number"
+    }
+}
+```
+
+## SDKs
+- iOS SDK: [GitHub Repository](https://github.com/stompcoin/ios-sdk)
+- Android SDK: [GitHub Repository](https://github.com/stompcoin/android-sdk)
+- Web SDK: [GitHub Repository](https://github.com/stompcoin/web-sdk)
+
 ## Support
 Bei Fragen oder Problemen wenden Sie sich bitte an:
 - E-Mail: api-support@stompcoin.com
-- Dokumentation: https://docs.stompcoin.com 
+- Dokumentation: https://docs.stompcoin.com
+- Stack Overflow: [stompcoin](https://stackoverflow.com/questions/tagged/stompcoin) 

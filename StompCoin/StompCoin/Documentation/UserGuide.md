@@ -1,12 +1,12 @@
-# StompCoin Benutzerhandbuch
+# Stomp Coin Benutzerhandbuch
 
 ## Einführung
-Willkommen bei StompCoin! Diese App verwandelt Ihre tägliche Bewegung in digitale Währung. Durch Gehen, Laufen und andere Aktivitäten verdienen Sie STOMP-Coins, die Sie für verschiedene Zwecke verwenden können.
+Willkommen bei Stomp Coin! Diese App verwandelt Ihre tägliche Bewegung in digitale Währung. Durch Gehen, Laufen und andere Aktivitäten verdienen Sie STOMP-Coins, die Sie für verschiedene Zwecke verwenden können.
 
 ## Erste Schritte
 
 ### Registrierung
-1. Laden Sie die StompCoin-App aus dem App Store herunter
+1. Laden Sie die Stomp Coin-App aus dem App Store herunter
 2. Öffnen Sie die App und tippen Sie auf "Registrieren"
 3. Geben Sie Ihre E-Mail-Adresse und ein sicheres Passwort ein
 4. Bestätigen Sie Ihre E-Mail-Adresse
@@ -78,7 +78,7 @@ Willkommen bei StompCoin! Diese App verwandelt Ihre tägliche Bewegung in digita
 - **FAQ**: Häufig gestellte Fragen
 - **E-Mail**: support@stompcoin.com
 - **Live-Chat**: In-App Support
-- **Community**: StompCoin Forum
+- **Community**: Stomp Coin Forum
 
 ### Fehlerbehebung
 1. Überprüfen Sie Ihre Internetverbindung

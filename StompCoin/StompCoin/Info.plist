@@ -5,7 +5,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleDisplayName</key>
-    <string>StompCoin</string>
+    <string>Stomp Coin</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -23,13 +23,13 @@
     <key>LSRequiresIPhoneOS</key>
     <true/>
     <key>NSHealthShareUsageDescription</key>
-    <string>StompCoin benötigt Zugriff auf Ihre Gesundheitsdaten, um Ihre Tanzschritte zu tracken und in Coins umzuwandeln.</string>
+    <string>Stomp Coin benötigt Zugriff auf Ihre Gesundheitsdaten, um Ihre Tanzschritte zu tracken und in Coins umzuwandeln.</string>
     <key>NSHealthUpdateUsageDescription</key>
-    <string>StompCoin benötigt die Erlaubnis, Ihre Gesundheitsdaten zu aktualisieren, um Ihre Tanzschritte zu speichern.</string>
+    <string>Stomp Coin benötigt die Erlaubnis, Ihre Gesundheitsdaten zu aktualisieren, um Ihre Tanzschritte zu speichern.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>StompCoin benötigt Ihren Standort, um nahegelegene Events zu finden und Ihre Teilnahme zu verfolgen.</string>
+    <string>Stomp Coin benötigt Ihren Standort, um nahegelegene Events zu finden und Ihre Teilnahme zu verfolgen.</string>
     <key>NSMotionUsageDescription</key>
-    <string>StompCoin benötigt Zugriff auf die Bewegungssensoren, um Ihre Tanzschritte zu erkennen.</string>
+    <string>Stomp Coin benötigt Zugriff auf die Bewegungssensoren, um Ihre Tanzschritte zu erkennen.</string>
     <key>UIApplicationSceneManifest</key>
     <dict>
         <key>UIApplicationSupportsMultipleScenes</key>

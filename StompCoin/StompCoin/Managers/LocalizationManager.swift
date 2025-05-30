@@ -67,9 +67,28 @@ class LocalizationManager {
     }
     
     func convertCurrency(_ amount: Double, from sourceCurrency: String, to targetCurrency: String) async throws -> Double {
-        // Hier würde die Integration mit einem Währungs-API erfolgen
-        // Beispiel: Fixer.io, ExchangeRate-API, etc.
-        return amount // Platzhalter
+        let endpoint = "\(Config.exchangeRateAPI)/convert"
+        var request = URLRequest(url: URL(string: endpoint)!)
+        request.httpMethod = "GET"
+        request.setValue(Config.exchangeRateAPIKey, forHTTPHeaderField: "X-API-Key")
+        
+        let queryItems = [
+            URLQueryItem(name: "from", value: sourceCurrency),
+            URLQueryItem(name: "to", value: targetCurrency),
+            URLQueryItem(name: "amount", value: String(amount))
+        ]
+        
+        request.url?.append(queryItems: queryItems)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw LocalizationError.conversionFailed
+        }
+        
+        let result = try JSONDecoder().decode(ExchangeRateResponse.self, from: data)
+        return result.convertedAmount
     }
     
     // MARK: - Datumsformatierung
@@ -112,11 +131,50 @@ class LocalizationManager {
     }
     
     private func getDateFormat() -> String {
-        return dateFormatter.dateFormat ?? "dd.MM.yyyy"
+        let formatter = DateFormatter()
+        formatter.locale = currentLocale
+        formatter.dateStyle = .medium
+        return formatter.dateFormat
     }
     
     private func getTimeFormat() -> String {
-        return dateFormatter.timeFormat ?? "HH:mm"
+        let formatter = DateFormatter()
+        formatter.locale = currentLocale
+        formatter.timeStyle = .medium
+        return formatter.timeFormat
+    }
+    
+    // Lokalisierte Zahlen
+    func localizedNumber(_ number: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.locale = currentLocale
+        formatter.numberStyle = .decimal
+        return formatter.string(from: NSNumber(value: number)) ?? String(number)
+    }
+    
+    // Lokalisierte Währungen
+    func localizedCurrency(_ amount: Double, currencyCode: String) -> String {
+        let formatter = NumberFormatter()
+        formatter.locale = currentLocale
+        formatter.numberStyle = .currency
+        formatter.currencyCode = currencyCode
+        return formatter.string(from: NSNumber(value: amount)) ?? String(amount)
+    }
+    
+    // Lokalisierte Datumsangaben
+    func localizedDate(_ date: Date, style: DateFormatter.Style) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = currentLocale
+        formatter.dateStyle = style
+        return formatter.string(from: date)
+    }
+    
+    // Lokalisierte Zeiten
+    func localizedTime(_ date: Date, style: DateFormatter.Style) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = currentLocale
+        formatter.timeStyle = style
+        return formatter.string(from: date)
     }
 }
 
@@ -140,7 +198,7 @@ enum MeasurementSystem {
 extension LocalizationManager {
     struct Strings {
         // Allgemein
-        static let appName = "StompCoin"
+        static let appName = "Stomp Coin"
         static let ok = "OK"
         static let cancel = "Abbrechen"
         static let error = "Fehler"

@@ -76,23 +76,44 @@ struct Server {
     private func configureDatabase() {
         // Datenbank-Konfiguration
         database.configure()
+        
+        // MongoDB Verbindung
+        let mongoClient = try? MongoClient(connectionString: Config.databaseURL)
+        let database = mongoClient?.db(Config.databaseName)
+        
+        // Collections initialisieren
+        usersCollection = database?.collection("users")
+        transactionsCollection = database?.collection("transactions")
+        challengesCollection = database?.collection("challenges")
+        eventsCollection = database?.collection("events")
     }
     
     // MARK: - Route Handler
     
     private func registerUser(req: Request) async throws -> Response {
-        // Benutzerregistrierung implementieren
-        return Response()
+        let user = try req.content.decode(User.self)
+        try await usersCollection?.insertOne(user)
+        return Response(status: .created)
     }
     
     private func loginUser(req: Request) async throws -> Response {
-        // Benutzeranmeldung implementieren
-        return Response()
+        let credentials = try req.content.decode(LoginCredentials.self)
+        guard let user = try await usersCollection?.findOne(["email": credentials.email]) else {
+            throw AuthError.invalidCredentials
+        }
+        // JWT Token generieren
+        let token = try generateJWT(for: user)
+        return Response(status: .ok, body: .init(string: token))
     }
     
     private func getUser(req: Request) async throws -> Response {
-        // Benutzerinformationen abrufen
-        return Response()
+        guard let userId = req.parameters.get("id") else {
+            throw ValidationError.missingParameter
+        }
+        guard let user = try await usersCollection?.findOne(["_id": userId]) else {
+            throw NotFoundError.userNotFound
+        }
+        return Response(status: .ok, body: .init(data: try JSONEncoder().encode(user)))
     }
     
     private func updateUser(req: Request) async throws -> Response {
@@ -156,8 +177,23 @@ struct Server {
     }
     
     private func createTrade(req: Request) async throws -> Response {
-        // Trade erstellen
-        return Response()
+        let trade = try req.content.decode(Trade.self)
+        
+        // Trade-Validierung
+        guard let fromUser = try await usersCollection?.findOne(["_id": trade.fromUserId]),
+              let toUser = try await usersCollection?.findOne(["_id": trade.toUserId]) else {
+            throw TradingError.invalidUsers
+        }
+        
+        // Wallet-Überprüfung
+        guard fromUser.wallet.balance >= trade.amount else {
+            throw TradingError.insufficientFunds
+        }
+        
+        // Trade ausführen
+        try await executeTrade(trade)
+        
+        return Response(status: .ok)
     }
     
     private func getTrades(req: Request) async throws -> Response {
@@ -166,8 +202,19 @@ struct Server {
     }
     
     private func startMining(req: Request) async throws -> Response {
-        // Mining starten
-        return Response()
+        let miningRequest = try req.content.decode(MiningRequest.self)
+        let user = try await validateUser(miningRequest.userId)
+        
+        // Mining-Validierung
+        guard user.wallet.isVerified else {
+            throw MiningError.verificationRequired
+        }
+        
+        // Mining-Prozess starten
+        let miningProcess = MiningProcess(userId: user.id)
+        try await miningProcess.start()
+        
+        return Response(status: .ok)
     }
     
     private func getMiningStats(req: Request) async throws -> Response {
