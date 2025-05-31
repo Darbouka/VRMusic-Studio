@@ -1,81 +1,109 @@
 # StompCoin
 
-StompCoin ist eine innovative iOS-App, die Fitness-Tracking mit Kryptowährung verbindet. Nutzer können durch körperliche Aktivität StompCoins verdienen, diese handeln und mit anderen Nutzern teilen.
+StompCoin ist eine innovative Fitness-App, die Bewegung in digitale Währung umwandelt. Durch Gehen, Laufen und andere Aktivitäten verdienen Nutzer STOMP-Coins, die für verschiedene Zwecke verwendet werden können.
 
 ## Features
 
-- **Fitness-Tracking**: Schritte, Distanz und Kalorienverbrauch
-- **Kryptowährung**: Mining durch Bewegung
-- **Wallet**: Sichere Verwaltung von StompCoins
-- **Social**: Freunde hinzufügen, Gruppen erstellen
-- **Trading**: StompCoins kaufen und verkaufen
-- **Offline-Modus**: Funktionen auch ohne Internet
-- **Mehrsprachig**: Deutsch, Englisch, Französisch, Spanisch
-
-## Technische Details
-
-- **iOS Version**: 15.0+
-- **Swift Version**: 5.5
-- **Architektur**: MVVM
-- **Dependencies**: SwiftUI, Combine, CoreData
-- **APIs**: Blockchain, Fitness, Social, Analytics
+- 🏃‍♂️ **Fitness-Tracking**: Automatische Schrittzählung, Kalorienverbrauch und Distanzmessung
+- 💰 **STOMP-Coins**: Verdienen und Verwenden von digitaler Währung durch Bewegung
+- 🎵 **Musik-Integration**: Verschiedene Musikgenres mit unterschiedlichen Belohnungen
+- 🏆 **Leaderboard**: Wettbewerb mit anderen Nutzern
+- 🔒 **Sicherheit**: Zwei-Faktor-Authentifizierung und sichere Wallet-Verwaltung
 
 ## Installation
+
+### Voraussetzungen
+
+- macOS 12.0 oder höher
+- Xcode 14.0 oder höher
+- Swift 5.7 oder höher
+
+### Installation
 
 1. Repository klonen:
 ```bash
 git clone https://github.com/Darbouka/StompCoin.git
+cd StompCoin
 ```
 
 2. Dependencies installieren:
 ```bash
-cd StompCoin
-pod install
+swift package resolve
 ```
 
-3. Projekt öffnen:
+3. Projekt in Xcode öffnen:
 ```bash
-open StompCoin.xcworkspace
+open Package.swift
 ```
 
-4. API-Keys konfigurieren:
-- Öffne `Config.swift`
-- Trage deine API-Keys ein
+4. App bauen und ausführen:
+- Wähle das Scheme "StompCoin"
+- Drücke Cmd + R oder klicke auf den Play-Button
+
+## Projektstruktur
+
+```
+StompCoin/
+├── Sources/
+│   └── StompCoin/
+│       ├── Models/
+│       │   ├── AppState.swift
+│       │   └── MusicModels.swift
+│       ├── Views/
+│       │   ├── ContentView.swift
+│       │   ├── HomeView.swift
+│       │   ├── LeaderboardView.swift
+│       │   ├── MusicGenreListView.swift
+│       │   └── SettingsView.swift
+│       └── Resources/
+└── Tests/
+    └── StompCoinTests/
+```
 
 ## Entwicklung
 
-- **Branching**: Git Flow
-- **CI/CD**: GitHub Actions
-- **Tests**: Unit Tests, UI Tests
-- **Linting**: SwiftLint
-- **Documentation**: SwiftDoc
+### Coding Style
 
-## Deployment
+- Swift Style Guide von Apple folgen
+- Dokumentation für öffentliche APIs
+- Unit Tests für neue Features
 
-1. Version in `Config.swift` aktualisieren
-2. Tests ausführen:
+### Git Workflow
+
+1. Feature Branch erstellen:
 ```bash
-xcodebuild test -workspace StompCoin.xcworkspace -scheme StompCoin
+git checkout -b feature/neues-feature
 ```
-3. Archive erstellen:
+
+2. Änderungen committen:
 ```bash
-xcodebuild archive -workspace StompCoin.xcworkspace -scheme StompCoin
+git add .
+git commit -m "Beschreibung der Änderungen"
 ```
-4. App Store Connect hochladen
 
-## Sicherheit
+3. Branch pushen:
+```bash
+git push origin feature/neues-feature
+```
 
-- Verschlüsselte Datenspeicherung
-- Sichere API-Kommunikation
-- KYC-Verifizierung
-- Regelmäßige Sicherheitsaudits
-
-## Support
-
-- Email: support@stompcoin.com
-- Website: https://support.stompcoin.com
-- Twitter: @StompCoin
+4. Pull Request erstellen
 
 ## Lizenz
 
-Copyright © 2024 StompCoin. Alle Rechte vorbehalten. 
+Dieses Projekt ist unter der MIT-Lizenz lizenziert. Siehe [LICENSE](LICENSE) für Details.
+
+## Support
+
+Bei Fragen oder Problemen:
+- Erstelle ein Issue auf GitHub
+- Kontaktiere das Entwicklungsteam
+- Besuche unsere [Dokumentation](Documentation/UserGuide.md)
+
+## Mitwirken
+
+Wir freuen uns über Beiträge! Bitte:
+1. Fork das Repository
+2. Erstelle einen Feature Branch
+3. Committe deine Änderungen
+4. Pushe zum Branch
+5. Erstelle einen Pull Request 
