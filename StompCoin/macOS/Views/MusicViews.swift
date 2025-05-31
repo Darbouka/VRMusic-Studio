@@ -57,9 +57,9 @@ struct MusicGenreCard: View {
                     .lineLimit(2)
                 
                 Text("\(floorCount) Floors")
-                    .font(.caption)
+                        .font(.caption)
                     .foregroundColor(color)
-            }
+                }
             .padding(.horizontal)
             .padding(.bottom)
         }
@@ -87,7 +87,7 @@ struct MusicGenreDetailView: View {
                         .foregroundColor(.secondary)
                 }
                 .padding()
-                
+                    
                 // Verfügbare Floors
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Verfügbare Floors")
@@ -104,13 +104,13 @@ struct MusicGenreDetailView: View {
                             reward: floor.reward,
                             color: .blue
                         )
+                        }
                     }
-                }
             }
         }
         .navigationTitle(genre.name)
         .sheet(item: $selectedFloor) { floor in
-            FloorDetailView(floor: floor)
+                FloorDetailView(floor: floor)
         }
     }
 }
@@ -157,8 +157,8 @@ struct FloorCard: View {
             
             Image(systemName: "chevron.right")
                 .foregroundColor(.secondary)
-        }
-        .padding()
+            }
+            .padding()
         .background(Color(.windowBackgroundColor))
         .cornerRadius(12)
         .padding(.horizontal)
@@ -181,13 +181,13 @@ struct FloorDetailView: View {
                     .clipped()
                     .cornerRadius(12)
                 
-                Text(floor.name)
-                    .font(.title)
+                    Text(floor.name)
+                        .font(.title)
                     .bold()
-                
-                Text(floor.description)
-                    .font(.body)
-                    .foregroundColor(.secondary)
+                    
+                    Text(floor.description)
+                        .font(.body)
+                        .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             }
@@ -214,27 +214,27 @@ struct FloorDetailView: View {
                     icon: "dollarsign.circle.fill",
                     color: .green
                 )
-            }
+                    }
             .padding()
             .background(Color(.windowBackgroundColor))
             .cornerRadius(12)
             .padding(.horizontal)
             
             // Musik-Player
-            Button(action: {
-                isPlaying.toggle()
-            }) {
-                HStack {
-                    Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                    Button(action: {
+                        isPlaying.toggle()
+                    }) {
+                        HStack {
+                            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                     Text(isPlaying ? "Pause" : "Abspielen")
-                }
+                        }
                 .frame(width: 200)
             }
             .buttonStyle(.borderedProminent)
             
             Spacer()
-        }
-        .padding()
+                }
+                .padding()
         .frame(width: 600, height: 700)
         .toolbar {
             ToolbarItem(placement: .automatic) {
