@@ -1,6 +1,6 @@
 # StompCoin
 
-StompCoin ist eine innovative Fitness-App, die Bewegung in digitale Währung umwandelt. Durch Gehen, Laufen und andere Aktivitäten verdienen Nutzer STOMP-Coins, die für verschiedene Zwecke verwendet werden können.
+StompCoin ist eine innovative Tanz-App, die Tanzschritte in digitale Währung umwandelt. Durch Gehen, Laufen und ganz besonders beim Tanzen und natürlich auch andere Aktivitäten verdienen Nutzer STOMP-Coins, die für verschiedene Zwecke verwendet werden können.
 
 ## Features
 
