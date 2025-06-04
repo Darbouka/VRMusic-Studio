@@ -1,0 +1,3 @@
+[submodule "VR-DAW"]
+	path = VR-DAW
+	url = https://github.com/Darbouka/VR-DAW.git
