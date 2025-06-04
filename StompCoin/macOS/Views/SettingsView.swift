@@ -32,7 +32,7 @@ struct SettingsView: View {
                     Button("Abmelden") {
                         showLogoutAlert = true
                     }
-                    .foregroundColor(.red)
+                            .foregroundColor(.red)
                 }
             }
             .navigationTitle("Einstellungen")
