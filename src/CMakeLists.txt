@@ -1,0 +1,5 @@
+add_subdirectory(core)
+add_subdirectory(audio)
+add_subdirectory(vr)
+add_subdirectory(ui)
+add_subdirectory(utils) 

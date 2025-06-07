@@ -90,4 +90,65 @@ fastlane/test_output
 iOSInjectionProject/
 
 # macOS
-.DS_Store 
+.DS_Store
+
+# Build-Verzeichnisse
+out/
+cmake-build-*/
+
+# IDE-spezifische Dateien
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Kompilierte Dateien
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+
+# CMake generierte Dateien
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+
+# Dependencies
+deps/
+external/
+
+# Logs und temporäre Dateien
+*.log
+*.tmp
+*.temp
+logs/
+
+# Dokumentation
+docs/_build/
+docs/api/
+
+# Test-Coverage
+coverage/
+*.gcno
+*.gcda
+
+# VST/AU/AAX Plugin-Builds
+*.vst/
+*.component/
+*.aaxplugin/
+
+# Projekt-spezifische Dateien
+*.wav
+*.mp3
+*.mid
+*.midi
+*.sf2
+*.sf3
+*.dll
+*.vst3 

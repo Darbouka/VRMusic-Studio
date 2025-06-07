@@ -1,0 +1,23 @@
+{
+    "name": "vr-daw",
+    "version": "1.0.0",
+    "dependencies": [
+        "openal-soft",
+        "sndfile",
+        "portaudio",
+        "glm",
+        "spdlog",
+        "nlohmann-json"
+    ],
+    "builtin-baseline": "2024-02-14",
+    "overrides": [
+        {
+            "name": "openal-soft",
+            "version": "1.22.2"
+        },
+        {
+            "name": "sndfile",
+            "version": "1.2.0"
+        }
+    ]
+} 

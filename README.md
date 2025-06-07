@@ -1,109 +1,90 @@
-# StompCoin
+# VR-DAW (Virtual Reality Digital Audio Workstation)
 
-StompCoin ist eine innovative Tanz-App, die Tanzschritte in digitale Währung umwandelt. Durch Gehen, Laufen und ganz besonders beim Tanzen und natürlich auch andere Aktivitäten verdienen Nutzer STOMP-Coins, die für verschiedene Zwecke verwendet werden können.
+Eine moderne, leistungsstarke Digital Audio Workstation mit Virtual Reality-Unterstützung.
 
 ## Features
 
-- 🏃‍♂️ **Fitness-Tracking**: Automatische Schrittzählung, Kalorienverbrauch und Distanzmessung
-- 💰 **STOMP-Coins**: Verdienen und Verwenden von digitaler Währung durch Bewegung
-- 🎵 **Musik-Integration**: Verschiedene Musikgenres mit unterschiedlichen Belohnungen
-- 🏆 **Leaderboard**: Wettbewerb mit anderen Nutzern
-- 🔒 **Sicherheit**: Zwei-Faktor-Authentifizierung und sichere Wallet-Verwaltung
+- **3D-Audio-Verarbeitung**
+  - Raumklang-Unterstützung
+  - Binaurales Rendering
+  - Ambisonics-Integration
+
+- **VR-Integration**
+  - Natürliche Handgesten-Steuerung
+  - Immersive Benutzeroberfläche
+  - 3D-Visualisierung von Audio
+
+- **Audio-Engine**
+  - Echtzeit-Audio-Verarbeitung
+  - VST3/AU/AAX Plugin-Unterstützung
+  - Multi-Core-Verarbeitung
+  - GPU-Beschleunigung
+
+- **Benutzeroberfläche**
+  - Moderne, intuitive UI
+  - Anpassbare Layouts
+  - Touch- und Gestensteuerung
+
+## Systemanforderungen
+
+- **Betriebssystem**: macOS 10.15 oder höher
+- **CPU**: Intel Core i7 oder Apple Silicon
+- **RAM**: 16GB oder mehr
+- **GPU**: NVIDIA GTX 1060 oder höher
+- **VR-Headset**: Oculus Quest 2/Pro oder Valve Index
 
 ## Installation
 
-### Voraussetzungen
-
-- macOS 12.0 oder höher
-- Xcode 14.0 oder höher
-- Swift 5.7 oder höher
-
-### Installation
-
-1. Repository klonen:
 ```bash
-git clone https://github.com/Darbouka/StompCoin.git
-cd StompCoin
-```
+# Repository klonen
+git clone https://github.com/yourusername/VR-DAW-1.git
+cd VR-DAW-1
 
-2. Dependencies installieren:
-```bash
-swift package resolve
-```
+# Build-Verzeichnis erstellen
+mkdir build && cd build
 
-3. Projekt in Xcode öffnen:
-```bash
-open Package.swift
-```
+# Projekt konfigurieren
+cmake ..
 
-4. App bauen und ausführen:
-- Wähle das Scheme "StompCoin"
-- Drücke Cmd + R oder klicke auf den Play-Button
-
-## Projektstruktur
-
-```
-StompCoin/
-├── Sources/
-│   └── StompCoin/
-│       ├── Models/
-│       │   ├── AppState.swift
-│       │   └── MusicModels.swift
-│       ├── Views/
-│       │   ├── ContentView.swift
-│       │   ├── HomeView.swift
-│       │   ├── LeaderboardView.swift
-│       │   ├── MusicGenreListView.swift
-│       │   └── SettingsView.swift
-│       └── Resources/
-└── Tests/
-    └── StompCoinTests/
+# Projekt bauen
+make -j4
 ```
 
 ## Entwicklung
 
-### Coding Style
+### Projektstruktur
 
-- Swift Style Guide von Apple folgen
-- Dokumentation für öffentliche APIs
-- Unit Tests für neue Features
-
-### Git Workflow
-
-1. Feature Branch erstellen:
-```bash
-git checkout -b feature/neues-feature
+```
+VR-DAW-1/
+├── src/                # Quellcode
+│   ├── core/          # Kernfunktionalitäten
+│   ├── audio/         # Audio-Verarbeitung
+│   ├── vr/            # VR-Komponenten
+│   ├── ui/            # Benutzeroberfläche
+│   └── utils/         # Hilfsfunktionen
+├── tests/             # Unit-Tests
+├── docs/              # Dokumentation
+└── build/             # Build-Verzeichnis
 ```
 
-2. Änderungen committen:
-```bash
-git add .
-git commit -m "Beschreibung der Änderungen"
-```
+### Abhängigkeiten
 
-3. Branch pushen:
-```bash
-git push origin feature/neues-feature
-```
-
-4. Pull Request erstellen
+- CMake 3.15+
+- C++17
+- OpenGL 4.1+
+- OpenVR
+- PortAudio
+- JUCE
+- GLM
+- GLEW
+- FreeType
 
 ## Lizenz
 
-Dieses Projekt ist unter der MIT-Lizenz lizenziert. Siehe [LICENSE](LICENSE) für Details.
+MIT License
 
-## Support
+## Kontakt
 
-Bei Fragen oder Problemen:
-- Erstelle ein Issue auf GitHub
-- Kontaktiere das Entwicklungsteam
-- Besuche unsere [Dokumentation](Documentation/UserGuide.md)
-
-## Mitwirken
-
-Wir freuen uns über Beiträge! Bitte:
-1. Fork das Repository
-2. Erstelle einen Feature Branch
-3. Committe deine Änderungen
-4. Pushe zum Branch
-5. Erstelle einen Pull Request 
+Für Fragen und Anregungen:
+- E-Mail: your.email@example.com
+- GitHub Issues
