@@ -33,7 +33,10 @@ target_link_libraries(VR-DAW-VR-Lib
     PUBLIC
         VR-DAW-Core
         ${OPENVR_LIBRARIES}
+<<<<<<< HEAD
         GLEW::GLEW
+=======
+>>>>>>> 0dff1c4 (init 2)
         glm::glm
 )
 
@@ -61,10 +64,51 @@ target_link_libraries(VR-DAW-VR
     PUBLIC
         VR-DAW-Core
         ${OPENVR_LIBRARIES}
+<<<<<<< HEAD
         glm
+=======
+        glm::glm
+>>>>>>> 0dff1c4 (init 2)
 )
 
 target_compile_definitions(VR-DAW-VR
     PRIVATE
         VR_DAW_VR_EXPORTS
+<<<<<<< HEAD
+=======
+)
+
+# VR-Bibliothek
+add_library(VRMusicStudio::VR STATIC
+    VREngine.cpp
+)
+
+target_include_directories(VRMusicStudio::VR
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+target_link_libraries(VRMusicStudio::VR
+    PUBLIC
+        OpenVR::OpenVR
+        glfw
+        glm::glm
+        ImGui::ImGui
+    PRIVATE
+        spdlog::spdlog
+)
+
+# Installationsregeln
+install(TARGETS VRMusicStudio::VR
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+)
+
+install(
+    DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    DESTINATION include/VRMusicStudio/vr
+    FILES_MATCHING PATTERN "*.hpp"
+>>>>>>> 0dff1c4 (init 2)
 ) 

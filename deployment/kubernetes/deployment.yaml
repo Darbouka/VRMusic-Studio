@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vrmusicstudio
+  namespace: vrmusic
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: vrmusicstudio
+  template:
+    metadata:
+      labels:
+        app: vrmusicstudio
+    spec:
+      containers:
+      - name: vrmusicstudio
+        image: vrmusicstudio:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: DB_HOST
+          value: "postgres"
+        - name: REDIS_HOST
+          value: "redis"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        volumeMounts:
+        - name: data
+          mountPath: /home/vrmusic/data
+        - name: config
+          mountPath: /home/vrmusic/config
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: vrmusic-data
+      - name: config
+        configMap:
+          name: vrmusic-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vrmusicstudio
+  namespace: vrmusic
+spec:
+  selector:
+    app: vrmusicstudio
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: LoadBalancer
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vrmusicstudio
+  namespace: vrmusic
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+  - hosts:
+    - vrmusicstudio.example.com
+    secretName: vrmusic-tls
+  rules:
+  - host: vrmusicstudio.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: vrmusicstudio
+            port:
+              number: 80
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: vrmusicstudio
+  namespace: vrmusic
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: vrmusicstudio
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70 

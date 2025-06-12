@@ -1,18 +1,109 @@
 #include "AIEngine.hpp"
+<<<<<<< HEAD
+=======
+#include <spdlog/spdlog.h>
+#include <torch/torch.h>
+#include <torch/script.h>
+>>>>>>> 0dff1c4 (init 2)
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
+<<<<<<< HEAD
 namespace AI_DAW {
 
 AIEngine::AIEngine() {
     initializeComponents();
 }
+=======
+namespace VRMusicStudio {
+
+struct AIEngine::Impl {
+    // KI-Modelle
+    torch::jit::script::Module musicGenerationModel;
+    torch::jit::script::Module styleTransferModel;
+    torch::jit::script::Module arrangementModel;
+    torch::jit::script::Module mixingModel;
+    
+    // KI-Parameter
+    struct GenerationParameters {
+        float temperature;
+        int maxLength;
+        std::string style;
+        std::vector<float> styleWeights;
+    };
+    
+    struct StyleTransferParameters {
+        std::string sourceStyle;
+        std::string targetStyle;
+        float blendFactor;
+        std::vector<float> styleFeatures;
+    };
+    
+    struct ArrangementParameters {
+        std::string genre;
+        std::vector<std::string> instruments;
+        float complexity;
+        std::vector<float> sectionWeights;
+    };
+    
+    struct MixingParameters {
+        std::string reference;
+        std::vector<float> eqCurve;
+        std::vector<float> dynamics;
+        float stereoWidth;
+    };
+    
+    GenerationParameters genParams;
+    StyleTransferParameters styleParams;
+    ArrangementParameters arrParams;
+    MixingParameters mixParams;
+    
+    // Zustandsvariablen
+    bool isGenerating;
+    bool isTransferring;
+    bool isArranging;
+    bool isMixing;
+    
+    // Callbacks
+    std::function<void(const std::vector<float>&)> generationCallback;
+    std::function<void(const std::vector<float>&)> transferCallback;
+    std::function<void(const std::vector<float>&)> arrangementCallback;
+    std::function<void(const std::vector<float>&)> mixingCallback;
+    
+    Impl() : isGenerating(false), isTransferring(false),
+             isArranging(false), isMixing(false) {
+        // Initialisiere KI-Parameter
+        genParams.temperature = 0.7f;
+        genParams.maxLength = 1024;
+        genParams.style = "classical";
+        genParams.styleWeights = {1.0f, 0.0f, 0.0f, 0.0f};
+        
+        styleParams.sourceStyle = "classical";
+        styleParams.targetStyle = "electronic";
+        styleParams.blendFactor = 0.5f;
+        styleParams.styleFeatures = {1.0f, 0.0f, 0.0f, 0.0f};
+        
+        arrParams.genre = "pop";
+        arrParams.instruments = {"piano", "drums", "bass", "guitar"};
+        arrParams.complexity = 0.5f;
+        arrParams.sectionWeights = {1.0f, 0.8f, 0.6f, 0.4f};
+        
+        mixParams.reference = "pop";
+        mixParams.eqCurve = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+        mixParams.dynamics = {0.0f, 0.0f, 0.0f, 0.0f};
+        mixParams.stereoWidth = 1.0f;
+    }
+};
+
+AIEngine::AIEngine() : pImpl(std::make_unique<Impl>()) {}
+>>>>>>> 0dff1c4 (init 2)
 
 AIEngine::~AIEngine() {
     shutdown();
 }
 
+<<<<<<< HEAD
 void AIEngine::initialize() {
     try {
         initializeComponents();
@@ -20,6 +111,205 @@ void AIEngine::initialize() {
     } catch (const std::exception& e) {
         handleErrors();
     }
+=======
+bool AIEngine::initialize() {
+    try {
+        // Lade KI-Modelle
+        pImpl->musicGenerationModel = torch::jit::load("models/music_generation.pt");
+        pImpl->styleTransferModel = torch::jit::load("models/style_transfer.pt");
+        pImpl->arrangementModel = torch::jit::load("models/arrangement.pt");
+        pImpl->mixingModel = torch::jit::load("models/mixing.pt");
+        
+        return true;
+    }
+    catch (const c10::Error& e) {
+        spdlog::error("Failed to load AI models: {}", e.what());
+        return false;
+    }
+}
+
+void AIEngine::setGenerationParameters(float temperature, int maxLength,
+                                     const std::string& style,
+                                     const std::vector<float>& styleWeights) {
+    pImpl->genParams.temperature = temperature;
+    pImpl->genParams.maxLength = maxLength;
+    pImpl->genParams.style = style;
+    pImpl->genParams.styleWeights = styleWeights;
+}
+
+void AIEngine::setStyleTransferParameters(const std::string& sourceStyle,
+                                        const std::string& targetStyle,
+                                        float blendFactor,
+                                        const std::vector<float>& styleFeatures) {
+    pImpl->styleParams.sourceStyle = sourceStyle;
+    pImpl->styleParams.targetStyle = targetStyle;
+    pImpl->styleParams.blendFactor = blendFactor;
+    pImpl->styleParams.styleFeatures = styleFeatures;
+}
+
+void AIEngine::setArrangementParameters(const std::string& genre,
+                                      const std::vector<std::string>& instruments,
+                                      float complexity,
+                                      const std::vector<float>& sectionWeights) {
+    pImpl->arrParams.genre = genre;
+    pImpl->arrParams.instruments = instruments;
+    pImpl->arrParams.complexity = complexity;
+    pImpl->arrParams.sectionWeights = sectionWeights;
+}
+
+void AIEngine::setMixingParameters(const std::string& reference,
+                                 const std::vector<float>& eqCurve,
+                                 const std::vector<float>& dynamics,
+                                 float stereoWidth) {
+    pImpl->mixParams.reference = reference;
+    pImpl->mixParams.eqCurve = eqCurve;
+    pImpl->mixParams.dynamics = dynamics;
+    pImpl->mixParams.stereoWidth = stereoWidth;
+}
+
+void AIEngine::generateMusic() {
+    if (pImpl->isGenerating) return;
+    
+    pImpl->isGenerating = true;
+    
+    try {
+        // Erstelle Eingabe-Tensor
+        std::vector<torch::jit::IValue> inputs;
+        inputs.push_back(torch::tensor(pImpl->genParams.styleWeights));
+        inputs.push_back(torch::tensor(pImpl->genParams.temperature));
+        inputs.push_back(torch::tensor(pImpl->genParams.maxLength));
+        
+        // Führe Modell aus
+        auto output = pImpl->musicGenerationModel.forward(inputs);
+        
+        // Konvertiere Ausgabe zu Audio-Daten
+        auto outputTensor = output.toTensor();
+        std::vector<float> audioData(outputTensor.data_ptr<float>(),
+                                   outputTensor.data_ptr<float>() + outputTensor.numel());
+        
+        if (pImpl->generationCallback) {
+            pImpl->generationCallback(audioData);
+        }
+    }
+    catch (const c10::Error& e) {
+        spdlog::error("Music generation failed: {}", e.what());
+    }
+    
+    pImpl->isGenerating = false;
+}
+
+void AIEngine::transferStyle(const std::vector<float>& inputAudio) {
+    if (pImpl->isTransferring) return;
+    
+    pImpl->isTransferring = true;
+    
+    try {
+        // Erstelle Eingabe-Tensor
+        std::vector<torch::jit::IValue> inputs;
+        inputs.push_back(torch::from_blob(const_cast<float*>(inputAudio.data()),
+                                        {1, static_cast<long>(inputAudio.size())}));
+        inputs.push_back(torch::tensor(pImpl->styleParams.styleFeatures));
+        inputs.push_back(torch::tensor(pImpl->styleParams.blendFactor));
+        
+        // Führe Modell aus
+        auto output = pImpl->styleTransferModel.forward(inputs);
+        
+        // Konvertiere Ausgabe zu Audio-Daten
+        auto outputTensor = output.toTensor();
+        std::vector<float> audioData(outputTensor.data_ptr<float>(),
+                                   outputTensor.data_ptr<float>() + outputTensor.numel());
+        
+        if (pImpl->transferCallback) {
+            pImpl->transferCallback(audioData);
+        }
+    }
+    catch (const c10::Error& e) {
+        spdlog::error("Style transfer failed: {}", e.what());
+    }
+    
+    pImpl->isTransferring = false;
+}
+
+void AIEngine::arrangeMusic(const std::vector<float>& inputAudio) {
+    if (pImpl->isArranging) return;
+    
+    pImpl->isArranging = true;
+    
+    try {
+        // Erstelle Eingabe-Tensor
+        std::vector<torch::jit::IValue> inputs;
+        inputs.push_back(torch::from_blob(const_cast<float*>(inputAudio.data()),
+                                        {1, static_cast<long>(inputAudio.size())}));
+        inputs.push_back(torch::tensor(pImpl->arrParams.sectionWeights));
+        inputs.push_back(torch::tensor(pImpl->arrParams.complexity));
+        
+        // Führe Modell aus
+        auto output = pImpl->arrangementModel.forward(inputs);
+        
+        // Konvertiere Ausgabe zu Audio-Daten
+        auto outputTensor = output.toTensor();
+        std::vector<float> audioData(outputTensor.data_ptr<float>(),
+                                   outputTensor.data_ptr<float>() + outputTensor.numel());
+        
+        if (pImpl->arrangementCallback) {
+            pImpl->arrangementCallback(audioData);
+        }
+    }
+    catch (const c10::Error& e) {
+        spdlog::error("Music arrangement failed: {}", e.what());
+    }
+    
+    pImpl->isArranging = false;
+}
+
+void AIEngine::mixAudio(const std::vector<float>& inputAudio) {
+    if (pImpl->isMixing) return;
+    
+    pImpl->isMixing = true;
+    
+    try {
+        // Erstelle Eingabe-Tensor
+        std::vector<torch::jit::IValue> inputs;
+        inputs.push_back(torch::from_blob(const_cast<float*>(inputAudio.data()),
+                                        {1, static_cast<long>(inputAudio.size())}));
+        inputs.push_back(torch::tensor(pImpl->mixParams.eqCurve));
+        inputs.push_back(torch::tensor(pImpl->mixParams.dynamics));
+        inputs.push_back(torch::tensor(pImpl->mixParams.stereoWidth));
+        
+        // Führe Modell aus
+        auto output = pImpl->mixingModel.forward(inputs);
+        
+        // Konvertiere Ausgabe zu Audio-Daten
+        auto outputTensor = output.toTensor();
+        std::vector<float> audioData(outputTensor.data_ptr<float>(),
+                                   outputTensor.data_ptr<float>() + outputTensor.numel());
+        
+        if (pImpl->mixingCallback) {
+            pImpl->mixingCallback(audioData);
+        }
+    }
+    catch (const c10::Error& e) {
+        spdlog::error("Audio mixing failed: {}", e.what());
+    }
+    
+    pImpl->isMixing = false;
+}
+
+void AIEngine::setGenerationCallback(std::function<void(const std::vector<float>&)> callback) {
+    pImpl->generationCallback = callback;
+}
+
+void AIEngine::setTransferCallback(std::function<void(const std::vector<float>&)> callback) {
+    pImpl->transferCallback = callback;
+}
+
+void AIEngine::setArrangementCallback(std::function<void(const std::vector<float>&)> callback) {
+    pImpl->arrangementCallback = callback;
+}
+
+void AIEngine::setMixingCallback(std::function<void(const std::vector<float>&)> callback) {
+    pImpl->mixingCallback = callback;
+>>>>>>> 0dff1c4 (init 2)
 }
 
 void AIEngine::update() {
@@ -446,4 +736,8 @@ float AIEngine::calculateTransient(const std::vector<float>& buffer) {
     return 0.0f;
 }
 
+<<<<<<< HEAD
 } // namespace AI_DAW 
+=======
+} // namespace VRMusicStudio 
+>>>>>>> 0dff1c4 (init 2)

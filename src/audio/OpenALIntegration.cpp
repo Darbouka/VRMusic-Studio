@@ -5,6 +5,10 @@
 #include <AL/al.h>
 #include <AL/alc.h>
 #include <AL/alext.h>
+<<<<<<< HEAD
+=======
+#include <AL/efx.h>
+>>>>>>> 0dff1c4 (init 2)
 
 namespace VR_DAW {
 
@@ -14,8 +18,12 @@ OpenALIntegration& OpenALIntegration::getInstance() {
 }
 
 OpenALIntegration::OpenALIntegration()
+<<<<<<< HEAD
     : initialized(false)
     , device(nullptr)
+=======
+    : device(nullptr)
+>>>>>>> 0dff1c4 (init 2)
     , context(nullptr)
     , reverbEffect(0)
     , echoEffect(0)
@@ -23,8 +31,14 @@ OpenALIntegration::OpenALIntegration()
     , roomSize(10.0f)
     , roomReflection(0.5f)
     , roomAbsorption(0.5f)
+<<<<<<< HEAD
     , logger("OpenALIntegration") {
     
+=======
+    , logger("OpenALIntegration")
+    , initialized(false)
+{
+>>>>>>> 0dff1c4 (init 2)
     listener.position = glm::vec3(0.0f);
     listener.orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
     listener.volume = 1.0f;

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 find_package(GTest REQUIRED)
 
 set(TEST_SOURCES
@@ -58,3 +59,23 @@ endif()
 
 enable_testing()
 add_test(NAME VR-DAW-Tests COMMAND VR-DAW-Tests) 
+=======
+# Test-Konfiguration
+enable_testing()
+
+# Google Test
+find_package(GTest REQUIRED)
+
+# Unit Tests
+add_subdirectory(unit)
+
+# Integration Tests
+add_subdirectory(integration)
+
+# Test-Ausführung
+add_custom_target(run_tests
+    COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+    DEPENDS unit_tests integration_tests
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+) 
+>>>>>>> 0dff1c4 (init 2)

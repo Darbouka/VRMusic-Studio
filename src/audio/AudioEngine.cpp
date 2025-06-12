@@ -4,6 +4,7 @@
 #include <nlohmann/json.hpp>
 #include <algorithm>
 #include <cmath>
+<<<<<<< HEAD
 
 namespace VR_DAW {
 
@@ -25,11 +26,61 @@ AudioEngine::AudioEngine()
 {
     initializeComponents();
 }
+=======
+#include <spdlog/spdlog.h>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+
+namespace VRMusicStudio {
+
+struct AudioEngine::Impl {
+    PaStream* stream;
+    int sampleRate;
+    int bufferSize;
+    int numChannels;
+    
+    std::map<std::string, AudioTrack> tracks;
+    std::map<std::string, AudioEffect> effects;
+    std::map<std::string, AudioBus> buses;
+    std::map<std::string, AudioDevice> devices;
+    
+    bool isPlaying;
+    bool isPaused;
+    double currentPosition;
+    
+    std::function<void(const juce::AudioBuffer<float>&)> processCallback;
+    std::function<void(const juce::MidiMessage&)> midiCallback;
+    std::function<void(const std::string&)> errorCallback;
+    
+    std::mutex audioMutex;
+    std::condition_variable audioCV;
+    std::thread audioThread;
+    bool isProcessing;
+    
+    std::vector<MIDIDevice> midiDevices;
+    std::string currentMidiInputDevice;
+    std::string currentMidiOutputDevice;
+    
+    struct {
+        float x, y, z;
+        float yaw, pitch, roll;
+    } listener;
+    
+    Impl() : stream(nullptr), sampleRate(44100), bufferSize(1024), numChannels(2),
+             isPlaying(false), isPaused(false), currentPosition(0.0), isProcessing(false) {
+        listener = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+    }
+};
+
+AudioEngine::AudioEngine() : pImpl(std::make_unique<Impl>()) {}
+>>>>>>> 0dff1c4 (init 2)
 
 AudioEngine::~AudioEngine() {
     shutdown();
 }
 
+<<<<<<< HEAD
 void AudioEngine::initialize() {
     try {
         initializeComponents();
@@ -69,11 +120,69 @@ void AudioEngine::shutdown() {
         handleErrors();
         throw;
     }
+=======
+bool AudioEngine::initialize() {
+    if (!initializePortAudio()) {
+        if (pImpl->errorCallback) {
+            pImpl->errorCallback("Failed to initialize PortAudio");
+        }
+        return false;
+    }
+    
+    if (!initializeJUCE()) {
+        if (pImpl->errorCallback) {
+            pImpl->errorCallback("Failed to initialize JUCE");
+        }
+        return false;
+    }
+    
+    pImpl->isProcessing = true;
+    pImpl->audioThread = std::thread([this]() {
+        while (pImpl->isProcessing) {
+            std::unique_lock<std::mutex> lock(pImpl->audioMutex);
+            pImpl->audioCV.wait(lock, [this]() { return !pImpl->isPlaying || !pImpl->isProcessing; });
+            
+            if (pImpl->isPlaying && !pImpl->isPaused) {
+                juce::AudioBuffer<float> inputBuffer(pImpl->numChannels, pImpl->bufferSize);
+                juce::AudioBuffer<float> outputBuffer(pImpl->numChannels, pImpl->bufferSize);
+                
+                processAudio(inputBuffer, outputBuffer);
+                
+                if (pImpl->processCallback) {
+                    pImpl->processCallback(outputBuffer);
+                }
+                
+                pImpl->currentPosition += static_cast<double>(pImpl->bufferSize) / pImpl->sampleRate;
+            }
+        }
+    });
+    
+    return true;
+}
+
+void AudioEngine::shutdown() {
+    if (pImpl->isProcessing) {
+        pImpl->isProcessing = false;
+        pImpl->audioCV.notify_all();
+        if (pImpl->audioThread.joinable()) {
+            pImpl->audioThread.join();
+        }
+    }
+    
+    if (pImpl->stream) {
+        Pa_StopStream(pImpl->stream);
+        Pa_CloseStream(pImpl->stream);
+        pImpl->stream = nullptr;
+    }
+    
+    Pa_Terminate();
+>>>>>>> 0dff1c4 (init 2)
 }
 
 bool AudioEngine::initializePortAudio() {
     PaError err = Pa_Initialize();
     if (err != paNoError) {
+<<<<<<< HEAD
         logger.error("Fehler bei der PortAudio-Initialisierung: {}", Pa_GetErrorText(err));
         return false;
     }
@@ -1040,10 +1149,158 @@ void AudioEngine::AdvancedProcessing::applyTemporalProcessing(
             if (index + 1 < temp.size()) {
                 output[i] = temp[index] * (1.0f - frac) + temp[index + 1] * frac;
             }
+=======
+        spdlog::error("PortAudio initialization failed: {}", Pa_GetErrorText(err));
+        return false;
+    }
+    
+    return true;
+}
+
+bool AudioEngine::initializeJUCE() {
+    juce::ScopedJuceInitialiser_GUI juceInit;
+    
+    juce::AudioFormatManager formatManager;
+    formatManager.registerBasicFormats();
+    
+    return true;
+}
+
+std::vector<AudioEngine::AudioDevice> AudioEngine::getAvailableDevices() {
+    std::vector<AudioDevice> devices;
+    int numDevices = Pa_GetDeviceCount();
+    
+    for (int i = 0; i < numDevices; ++i) {
+        const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(i);
+        if (deviceInfo) {
+            AudioDevice device;
+            device.id = std::to_string(i);
+            device.name = deviceInfo->name;
+            device.type = (deviceInfo->maxInputChannels > 0) ? "Input" : "Output";
+            device.numInputChannels = deviceInfo->maxInputChannels;
+            device.numOutputChannels = deviceInfo->maxOutputChannels;
+            device.sampleRate = deviceInfo->defaultSampleRate;
+            device.bufferSize = 1024; // Default
+            
+            devices.push_back(device);
+        }
+    }
+    
+    return devices;
+}
+
+bool AudioEngine::setInputDevice(const std::string& deviceId) {
+    // TODO: Implementiere Input-Device-Wechsel
+    return true;
+}
+
+bool AudioEngine::setOutputDevice(const std::string& deviceId) {
+    // TODO: Implementiere Output-Device-Wechsel
+    return true;
+}
+
+std::string AudioEngine::createTrack(const std::string& name) {
+    std::lock_guard<std::mutex> lock(pImpl->audioMutex);
+    
+    AudioTrack track;
+    track.id = "track_" + std::to_string(pImpl->tracks.size());
+    track.name = name;
+    track.volume = 1.0;
+    track.pan = 0.0;
+    track.muted = false;
+    track.solo = false;
+    
+    pImpl->tracks[track.id] = track;
+    return track.id;
+}
+
+bool AudioEngine::loadAudioFile(const std::string& trackId, const std::string& filePath) {
+    std::lock_guard<std::mutex> lock(pImpl->audioMutex);
+    
+    auto it = pImpl->tracks.find(trackId);
+    if (it == pImpl->tracks.end()) {
+        return false;
+    }
+    
+    juce::File file(filePath);
+    if (!file.existsAsFile()) {
+        return false;
+    }
+    
+    juce::AudioFormatManager formatManager;
+    formatManager.registerBasicFormats();
+    
+    std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(file));
+    if (!reader) {
+        return false;
+    }
+    
+    it->second.reader = reader.release();
+    it->second.buffer.setSize(reader->numChannels, reader->lengthInSamples);
+    reader->read(&it->second.buffer, 0, reader->lengthInSamples, 0, true, true);
+    
+    return true;
+}
+
+bool AudioEngine::play() {
+    std::lock_guard<std::mutex> lock(pImpl->audioMutex);
+    if (pImpl->isPlaying) {
+        return false;
+    }
+    
+    pImpl->isPlaying = true;
+    pImpl->isPaused = false;
+    pImpl->audioCV.notify_one();
+    return true;
+}
+
+bool AudioEngine::pause() {
+    std::lock_guard<std::mutex> lock(pImpl->audioMutex);
+    if (!pImpl->isPlaying || pImpl->isPaused) {
+        return false;
+    }
+    
+    pImpl->isPaused = true;
+    return true;
+}
+
+bool AudioEngine::stop() {
+    std::lock_guard<std::mutex> lock(pImpl->audioMutex);
+    if (!pImpl->isPlaying) {
+        return false;
+    }
+    
+    pImpl->isPlaying = false;
+    pImpl->isPaused = false;
+    pImpl->currentPosition = 0.0;
+    return true;
+}
+
+void AudioEngine::processAudio(const juce::AudioBuffer<float>& input, juce::AudioBuffer<float>& output) {
+    output.clear();
+    
+    mixTracks(output);
+    
+    applyEffects(output);
+    
+    updateEffects();
+}
+
+void AudioEngine::mixTracks(juce::AudioBuffer<float>& output) {
+    for (const auto& [id, track] : pImpl->tracks) {
+        if (track.muted || (!track.solo && std::any_of(pImpl->tracks.begin(), pImpl->tracks.end(),
+            [](const auto& t) { return t.second.solo; }))) {
+            continue;
+        }
+        
+        for (int channel = 0; channel < output.getNumChannels(); ++channel) {
+            output.addFrom(channel, 0, track.buffer, channel, 0, output.getNumSamples(), track.volume);
+>>>>>>> 0dff1c4 (init 2)
         }
     }
 }
 
+<<<<<<< HEAD
 // Revolutionäre Plugin-Funktionen
 void AudioEngine::AdvancedProcessing::loadCustomPlugin(const std::string& pluginPath) {
     // Implementierung der revolutionären Plugin-Ladefunktion
@@ -1066,3 +1323,38 @@ void AudioEngine::AdvancedProcessing::savePluginState(const std::string& stateNa
 }
 
 } // namespace VR_DAW 
+=======
+void AudioEngine::applyEffects(juce::AudioBuffer<float>& buffer) {
+    for (const auto& [id, effect] : pImpl->effects) {
+        if (effect.processor) {
+            juce::MidiBuffer midiBuffer;
+            effect.processor->processBlock(buffer, midiBuffer);
+        }
+    }
+}
+
+void AudioEngine::updateEffects() {
+    for (auto& [id, effect] : pImpl->effects) {
+        if (effect.processor) {
+            effect.processor->prepareToPlay(pImpl->sampleRate, pImpl->bufferSize);
+        }
+    }
+}
+
+void AudioEngine::setProcessCallback(std::function<void(const juce::AudioBuffer<float>&)> callback) {
+    std::lock_guard<std::mutex> lock(pImpl->audioMutex);
+    pImpl->processCallback = callback;
+}
+
+void AudioEngine::setMIDICallback(std::function<void(const juce::MidiMessage&)> callback) {
+    std::lock_guard<std::mutex> lock(pImpl->audioMutex);
+    pImpl->midiCallback = callback;
+}
+
+void AudioEngine::setErrorCallback(std::function<void(const std::string&)> callback) {
+    std::lock_guard<std::mutex> lock(pImpl->audioMutex);
+    pImpl->errorCallback = callback;
+}
+
+} // namespace VRMusicStudio 
+>>>>>>> 0dff1c4 (init 2)

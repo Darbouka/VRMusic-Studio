@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  vrmusicstudio:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: vrmusicstudio:latest
+    container_name: vrmusicstudio
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=db
+      - REDIS_HOST=redis
+    volumes:
+      - ../data:/home/vrmusic/data
+      - ../config:/home/vrmusic/config
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+
+  db:
+    image: postgres:14
+    container_name: vrmusicstudio-db
+    environment:
+      - POSTGRES_USER=vrmusic
+      - POSTGRES_PASSWORD=vrmusic123
+      - POSTGRES_DB=vrmusicstudio
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    container_name: vrmusicstudio-redis
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.21
+    container_name: vrmusicstudio-nginx
+    volumes:
+      - ../config/nginx:/etc/nginx/conf.d
+      - ../data/static:/usr/share/nginx/html
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - vrmusicstudio
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data: 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+<<<<<<< HEAD
 #include <vector>
 #include <string>
 #include <mutex>
@@ -294,3 +295,173 @@ private:
 };
 
 } // namespace VR_DAW 
+=======
+#include <string>
+#include <vector>
+#include <map>
+#include <functional>
+#include <portaudio.h>
+#include <sndfile.h>
+#include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_audio_basics/juce_audio_basics.h>
+#include <juce_audio_devices/juce_audio_devices.h>
+#include <juce_audio_formats/juce_audio_formats.h>
+#include <juce_audio_plugin_client/juce_audio_plugin_client.h>
+#include <juce_audio_utils/juce_audio_utils.h>
+#include <juce_core/juce_core.h>
+#include <juce_data_structures/juce_data_structures.h>
+#include <juce_events/juce_events.h>
+#include <juce_graphics/juce_graphics.h>
+#include <juce_gui_basics/juce_gui_basics.h>
+#include <juce_gui_extra/juce_gui_extra.h>
+#include <juce_opengl/juce_opengl.h>
+#include <juce_recommended_config.h>
+
+namespace VRMusicStudio {
+
+class AudioEngine {
+public:
+    struct AudioTrack {
+        std::string id;
+        std::string name;
+        std::string filePath;
+        double volume;
+        double pan;
+        bool muted;
+        bool solo;
+        std::vector<std::shared_ptr<juce::AudioProcessor>> effects;
+        juce::AudioBuffer<float> buffer;
+        juce::AudioFormatReader* reader;
+    };
+
+    struct AudioEffect {
+        std::string id;
+        std::string name;
+        std::string type;
+        std::map<std::string, float> parameters;
+        std::shared_ptr<juce::AudioProcessor> processor;
+    };
+
+    struct AudioBus {
+        std::string id;
+        std::string name;
+        double volume;
+        double pan;
+        std::vector<std::string> trackIds;
+        std::vector<std::shared_ptr<juce::AudioProcessor>> effects;
+    };
+
+    struct AudioDevice {
+        std::string id;
+        std::string name;
+        std::string type;
+        int numInputChannels;
+        int numOutputChannels;
+        double sampleRate;
+        int bufferSize;
+    };
+
+    struct MIDIDevice {
+        std::string id;
+        std::string name;
+        std::string type;
+        bool isInput;
+        bool isOutput;
+    };
+
+    struct VSTPlugin {
+        std::string id;
+        std::string name;
+        std::string path;
+        std::string vendor;
+        std::string category;
+        std::shared_ptr<juce::AudioPluginInstance> instance;
+    };
+
+    AudioEngine();
+    ~AudioEngine();
+
+    // Initialisierung und Shutdown
+    bool initialize();
+    void shutdown();
+
+    // Audio-Geräte-Management
+    std::vector<AudioDevice> getAvailableDevices();
+    bool setInputDevice(const std::string& deviceId);
+    bool setOutputDevice(const std::string& deviceId);
+    bool setSampleRate(double sampleRate);
+    bool setBufferSize(int bufferSize);
+
+    // Track-Management
+    std::string createTrack(const std::string& name);
+    bool deleteTrack(const std::string& trackId);
+    bool loadAudioFile(const std::string& trackId, const std::string& filePath);
+    bool saveAudioFile(const std::string& trackId, const std::string& filePath);
+    bool setTrackVolume(const std::string& trackId, double volume);
+    bool setTrackPan(const std::string& trackId, double pan);
+    bool muteTrack(const std::string& trackId, bool mute);
+    bool soloTrack(const std::string& trackId, bool solo);
+
+    // Effekt-Management
+    std::string addEffect(const std::string& trackId, const std::string& effectType);
+    bool removeEffect(const std::string& trackId, const std::string& effectId);
+    bool setEffectParameter(const std::string& trackId, const std::string& effectId, 
+                           const std::string& parameter, float value);
+
+    // Bus-Management
+    std::string createBus(const std::string& name);
+    bool deleteBus(const std::string& busId);
+    bool addTrackToBus(const std::string& busId, const std::string& trackId);
+    bool removeTrackFromBus(const std::string& busId, const std::string& trackId);
+    bool setBusVolume(const std::string& busId, double volume);
+    bool setBusPan(const std::string& busId, double pan);
+
+    // Transport-Kontrolle
+    bool play();
+    bool pause();
+    bool stop();
+    bool seek(double position);
+    double getCurrentPosition() const;
+    bool isPlaying() const;
+    bool isPaused() const;
+
+    // MIDI-Unterstützung
+    std::vector<MIDIDevice> getAvailableMIDIDevices();
+    bool setMIDIInputDevice(const std::string& deviceId);
+    bool setMIDIOutputDevice(const std::string& deviceId);
+    void sendMIDIMessage(const juce::MidiMessage& message);
+
+    // VST-Plugin-Management
+    std::vector<VSTPlugin> getAvailablePlugins();
+    std::string loadPlugin(const std::string& pluginPath);
+    bool unloadPlugin(const std::string& pluginId);
+    bool setPluginParameter(const std::string& pluginId, const std::string& parameter, float value);
+
+    // 3D-Audio
+    bool set3DAudioListenerPosition(float x, float y, float z);
+    bool set3DAudioListenerOrientation(float yaw, float pitch, float roll);
+    bool set3DAudioSourcePosition(const std::string& trackId, float x, float y, float z);
+    bool set3DAudioSourceOrientation(const std::string& trackId, float yaw, float pitch, float roll);
+
+    // Callback-Setter
+    void setProcessCallback(std::function<void(const juce::AudioBuffer<float>&)> callback);
+    void setMIDICallback(std::function<void(const juce::MidiMessage&)> callback);
+    void setErrorCallback(std::function<void(const std::string&)> callback);
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+
+    // Private Hilfsmethoden
+    bool initializePortAudio();
+    bool initializeJUCE();
+    void processAudio(const juce::AudioBuffer<float>& input, juce::AudioBuffer<float>& output);
+    void processMIDI(const juce::MidiBuffer& midiMessages);
+    void updateEffects();
+    void mixTracks(juce::AudioBuffer<float>& output);
+    void applyEffects(juce::AudioBuffer<float>& buffer);
+    void cleanup();
+};
+
+} // namespace VRMusicStudio 
+>>>>>>> 0dff1c4 (init 2)

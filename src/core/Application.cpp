@@ -180,7 +180,11 @@ void Application::setConfigValue(const std::string& key, const std::string& valu
 
 std::string Application::getConfigValue(const std::string& key) const {
     if (pImpl->config) {
+<<<<<<< HEAD
         return pImpl->config->getValue(key);
+=======
+        return pImpl->config->getValue(key, std::string());
+>>>>>>> 0dff1c4 (init 2)
     }
     return "";
 }

@@ -4,6 +4,7 @@
 
 namespace VR_DAW {
 
+<<<<<<< HEAD
 std::unique_ptr<VRManager> VRManager::instance = nullptr;
 
 VRManager& VRManager::getInstance() {
@@ -11,14 +12,22 @@ VRManager& VRManager::getInstance() {
         instance = std::unique_ptr<VRManager>(new VRManager());
     }
     return *instance;
+=======
+VRManager& VRManager::getInstance() {
+    static VRManager instance;
+    return instance;
+>>>>>>> 0dff1c4 (init 2)
 }
 
 VRManager::VRManager()
     : vrSystem(nullptr)
     , initialized(false)
+<<<<<<< HEAD
     , running(false)
     , listenerPosition(0.0f)
     , listenerOrientation(1.0f, 0.0f, 0.0f, 0.0f)
+=======
+>>>>>>> 0dff1c4 (init 2)
     , logger("VRManager") {
 }
 
@@ -55,7 +64,10 @@ bool VRManager::initialize() {
         }
 
         initialized = true;
+<<<<<<< HEAD
         running = true;
+=======
+>>>>>>> 0dff1c4 (init 2)
         logger.info("VR-Manager erfolgreich initialisiert");
         return true;
     }
@@ -78,7 +90,10 @@ void VRManager::shutdown() {
         controllers.clear();
         hmd = VRDevice();
         initialized = false;
+<<<<<<< HEAD
         running = false;
+=======
+>>>>>>> 0dff1c4 (init 2)
         logger.info("VR-Manager erfolgreich beendet");
     }
     catch (const std::exception& e) {
@@ -91,6 +106,7 @@ bool VRManager::isInitialized() const {
     return initialized;
 }
 
+<<<<<<< HEAD
 void VRManager::update() {
     std::lock_guard<std::mutex> lock(mutex);
     
@@ -116,6 +132,19 @@ void VRManager::update() {
         return true;
     }
     catch (const std::exception& e) {
+=======
+bool VRManager::update() {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (!initialized) return false;
+    try {
+        processVREvents();
+        hmd = createDeviceInfo(vr::k_unTrackedDeviceIndex_Hmd);
+        for (auto& controller : controllers) {
+            controller = createDeviceInfo(controller.index);
+        }
+        return true;
+    } catch (const std::exception& e) {
+>>>>>>> 0dff1c4 (init 2)
         logger.error("Fehler beim VR-Update: {}", e.what());
         return false;
     }
@@ -310,6 +339,7 @@ glm::mat4 VRManager::convertSteamVRMatrixToMatrix4(const vr::HmdMatrix44_t& mat)
     return matrix;
 }
 
+<<<<<<< HEAD
 void VRManager::updateAudioPositions() {
     std::lock_guard<std::mutex> lock(mutex);
     
@@ -332,4 +362,6 @@ void VRManager::updateAudioEngine() {
     // z.B. Plugin-Updates, Effekt-Verarbeitung, etc.
 }
 
+=======
+>>>>>>> 0dff1c4 (init 2)
 } // namespace VR_DAW 

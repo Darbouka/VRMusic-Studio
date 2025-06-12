@@ -4,12 +4,20 @@
 #include <fstream>
 #include <sstream>
 #include <stb_image.h>
+<<<<<<< HEAD
+=======
+#include <stb_image_write.h>
+>>>>>>> 0dff1c4 (init 2)
 #include <sndfile.h>
 
 namespace VR_DAW {
 
 ResourceManager::ResourceManager()
     : initialized(false) {
+<<<<<<< HEAD
+=======
+    stbi_set_flip_vertically_on_load(true);
+>>>>>>> 0dff1c4 (init 2)
 }
 
 ResourceManager::~ResourceManager() {

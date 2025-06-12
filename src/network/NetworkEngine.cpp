@@ -1,4 +1,5 @@
 #include "NetworkEngine.hpp"
+<<<<<<< HEAD
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -447,3 +448,162 @@ float NetworkEngine::calculateTransient(const std::vector<float>& buffer) {
 }
 
 } // namespace Network_DAW 
+=======
+#include <spdlog/spdlog.h>
+#include <thread>
+#include <cstring>
+
+namespace VRMusicStudio {
+
+struct NetworkEngine::Impl {
+    ENetHost* host = nullptr;
+    ENetPeer* serverPeer = nullptr;
+    std::map<std::string, Peer> peers;
+    bool serverMode = false;
+    bool connected = false;
+    uint16_t port = 0;
+
+    std::function<void(const Peer&)> onConnect;
+    std::function<void(const Peer&)> onDisconnect;
+    std::function<void(const Message&)> onMessage;
+    std::function<void(const std::string&)> onError;
+};
+
+NetworkEngine::NetworkEngine() : pImpl(std::make_unique<Impl>()) {}
+NetworkEngine::~NetworkEngine() { shutdown(); }
+
+bool NetworkEngine::initialize(uint16_t port) {
+    if (enet_initialize() != 0) {
+        spdlog::error("ENet konnte nicht initialisiert werden");
+        return false;
+    }
+    ENetAddress address;
+    address.host = ENET_HOST_ANY;
+    address.port = port;
+    pImpl->host = enet_host_create(&address, 32, 2, 0, 0);
+    if (!pImpl->host) {
+        spdlog::error("ENet Host konnte nicht erstellt werden");
+        return false;
+    }
+    pImpl->port = port;
+    pImpl->serverMode = (port != 0);
+    return true;
+}
+
+void NetworkEngine::shutdown() {
+    if (pImpl->host) {
+        enet_host_destroy(pImpl->host);
+        pImpl->host = nullptr;
+    }
+    enet_deinitialize();
+    pImpl->peers.clear();
+    pImpl->serverPeer = nullptr;
+    pImpl->connected = false;
+}
+
+bool NetworkEngine::startServer(uint16_t port) {
+    return initialize(port);
+}
+
+bool NetworkEngine::connectToServer(const std::string& address, uint16_t port) {
+    if (!initialize(0)) return false;
+    ENetAddress enetAddress;
+    enet_address_set_host(&enetAddress, address.c_str());
+    enetAddress.port = port;
+    pImpl->serverPeer = enet_host_connect(pImpl->host, &enetAddress, 2, 0);
+    if (!pImpl->serverPeer) {
+        spdlog::error("Verbindung zum Server fehlgeschlagen");
+        return false;
+    }
+    pImpl->connected = true;
+    return true;
+}
+
+void NetworkEngine::disconnect() {
+    if (pImpl->serverPeer) {
+        enet_peer_disconnect(pImpl->serverPeer, 0);
+        pImpl->serverPeer = nullptr;
+    }
+    pImpl->connected = false;
+}
+
+bool NetworkEngine::isServer() const { return pImpl->serverMode; }
+bool NetworkEngine::isConnected() const { return pImpl->connected; }
+
+std::vector<NetworkEngine::Peer> NetworkEngine::getPeers() const {
+    std::vector<Peer> result;
+    for (const auto& [id, peer] : pImpl->peers) result.push_back(peer);
+    return result;
+}
+
+bool NetworkEngine::sendToPeer(const std::string& peerId, const Message& msg, bool reliable) {
+    // TODO: Implementiere Peer-Kommunikation
+    return true;
+}
+
+bool NetworkEngine::broadcast(const Message& msg, bool reliable) {
+    // TODO: Implementiere Broadcast
+    return true;
+}
+
+bool NetworkEngine::sendAudioBlock(const std::string& peerId, const std::vector<float>& audio) {
+    // TODO: Implementiere Audio-Block-Senden
+    return true;
+}
+
+bool NetworkEngine::sendPosition(const std::string& peerId, float x, float y, float z) {
+    // TODO: Implementiere Positions-Senden
+    return true;
+}
+
+void NetworkEngine::setOnConnect(std::function<void(const Peer&)> cb) { pImpl->onConnect = cb; }
+void NetworkEngine::setOnDisconnect(std::function<void(const Peer&)> cb) { pImpl->onDisconnect = cb; }
+void NetworkEngine::setOnMessage(std::function<void(const Message&)> cb) { pImpl->onMessage = cb; }
+void NetworkEngine::setOnError(std::function<void(const std::string&)> cb) { pImpl->onError = cb; }
+
+void NetworkEngine::pollEvents() {
+    if (!pImpl->host) return;
+    ENetEvent event;
+    while (enet_host_service(pImpl->host, &event, 0) > 0) {
+        handleEvent(event);
+    }
+}
+
+void NetworkEngine::handleEvent(ENetEvent& event) {
+    switch (event.type) {
+        case ENET_EVENT_TYPE_CONNECT: {
+            Peer peer;
+            peer.id = std::to_string(reinterpret_cast<uintptr_t>(event.peer));
+            peer.address = std::to_string(event.peer->address.host);
+            peer.port = event.peer->address.port;
+            peer.isConnected = true;
+            pImpl->peers[peer.id] = peer;
+            if (pImpl->onConnect) pImpl->onConnect(peer);
+            break;
+        }
+        case ENET_EVENT_TYPE_DISCONNECT: {
+            std::string id = std::to_string(reinterpret_cast<uintptr_t>(event.peer));
+            if (pImpl->peers.count(id)) {
+                Peer peer = pImpl->peers[id];
+                pImpl->peers.erase(id);
+                if (pImpl->onDisconnect) pImpl->onDisconnect(peer);
+            }
+            break;
+        }
+        case ENET_EVENT_TYPE_RECEIVE: {
+            Message msg;
+            msg.type = "data";
+            msg.senderId = std::to_string(reinterpret_cast<uintptr_t>(event.peer));
+            msg.data.assign(event.packet->data, event.packet->data + event.packet->dataLength);
+            if (pImpl->onMessage) pImpl->onMessage(msg);
+            enet_packet_destroy(event.packet);
+            break;
+        }
+        case ENET_EVENT_TYPE_NONE:
+        default:
+            break;
+    }
+}
+
+} // namespace VRMusicStudio 
+>>>>>>> 0dff1c4 (init 2)
