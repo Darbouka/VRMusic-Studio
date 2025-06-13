@@ -1,23 +1,55 @@
 #include "ResourceManager.hpp"
-#include "Logger.hpp"
+#include <stdexcept>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
-#include <stb_image.h>
-<<<<<<< HEAD
-=======
-#include <stb_image_write.h>
->>>>>>> 0dff1c4 (init 2)
-#include <sndfile.h>
+#include <algorithm>
+#include <cctype>
+#include <functional>
+#include <unordered_map>
+#include <string>
+#include <vector>
+#include <memory>
+#include <iostream>
+#include <spdlog/spdlog.h>
+#include "../thirdparty/stb_image.h"
+#include "../thirdparty/stb_image_write.h"
 
-namespace VR_DAW {
+namespace VRMusicStudio {
+namespace Core {
 
-ResourceManager::ResourceManager()
-    : initialized(false) {
-<<<<<<< HEAD
-=======
+namespace {
+    std::string generateResourceId(const std::string& path) {
+        return std::filesystem::path(path).filename().string();
+    }
+
+    ResourceType determineResourceType(const std::string& path) {
+        std::string ext = std::filesystem::path(path).extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+        if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") return ResourceType::Image;
+        if (ext == ".wav" || ext == ".mp3") return ResourceType::Audio;
+        if (ext == ".obj" || ext == ".fbx") return ResourceType::Model;
+        return ResourceType::Unknown;
+    }
+
+    std::vector<uint8_t> loadResourceData(const std::string& path) {
+        std::ifstream file(path, std::ios::binary);
+        if (!file) {
+            throw std::runtime_error("Konnte Datei nicht öffnen: " + path);
+        }
+        return std::vector<uint8_t>(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+    }
+}
+
+ResourceManager& ResourceManager::getInstance() {
+    static ResourceManager instance;
+    return instance;
+}
+
+ResourceManager::ResourceManager() 
+    : initialized(false)
+    , logger_(Logger::getInstance()) {
     stbi_set_flip_vertically_on_load(true);
->>>>>>> 0dff1c4 (init 2)
 }
 
 ResourceManager::~ResourceManager() {
@@ -34,11 +66,10 @@ bool ResourceManager::initialize() {
     try {
         resources.clear();
         initialized = true;
-        Logger("ResourceManager").info("Resource-Manager erfolgreich initialisiert");
+        logger_.info("Resource-Manager erfolgreich initialisiert");
         return true;
-    }
-    catch (const std::exception& e) {
-        Logger("ResourceManager").error("Fehler bei der Initialisierung des Resource-Managers: {}", e.what());
+    } catch (const std::exception& e) {
+        logger_.error("Fehler bei der Initialisierung des Resource-Managers: {}", e.what());
         return false;
     }
 }
@@ -53,11 +84,26 @@ void ResourceManager::shutdown() {
     try {
         unloadAllResources();
         initialized = false;
-        Logger("ResourceManager").info("Resource-Manager erfolgreich beendet");
+        logger_.info("Resource-Manager erfolgreich beendet");
+    } catch (const std::exception& e) {
+        logger_.error("Fehler beim Beenden des Resource-Managers: {}", e.what());
     }
-    catch (const std::exception& e) {
-        Logger("ResourceManager").error("Fehler beim Beenden des Resource-Managers: {}", e.what());
+}
+
+void ResourceManager::update() {
+    std::lock_guard<std::mutex> lock(mutex);
+    
+    if (!initialized) {
+        return;
     }
+
+    // Hier können periodische Aktualisierungen der Ressourcen durchgeführt werden
+    // z.B. Überprüfung auf Änderungen, Neuladen bei Bedarf, etc.
+}
+
+void ResourceManager::clear() {
+    std::lock_guard<std::mutex> lock(mutex);
+    resources.clear();
 }
 
 bool ResourceManager::loadResource(const std::string& resourcePath) {
@@ -69,12 +115,12 @@ bool ResourceManager::loadResource(const std::string& resourcePath) {
 
     try {
         if (!validateResource(resourcePath)) {
-            throw ResourceLoadException("Ungültige Ressource: " + resourcePath);
+            throw ResourceException("Ungültige Ressource: " + resourcePath);
         }
 
         std::string resourceId = generateResourceId(resourcePath);
         if (isResourceLoaded(resourceId)) {
-            Logger("ResourceManager").warn("Ressource bereits geladen: {}", resourceId);
+            logger_.warn("Ressource bereits geladen: {}", resourceId);
             return true;
         }
 
@@ -86,15 +132,10 @@ bool ResourceManager::loadResource(const std::string& resourcePath) {
         info.size = std::filesystem::file_size(resourcePath);
 
         resources[resourceId] = info;
-        Logger("ResourceManager").info("Ressource erfolgreich geladen: {}", resourceId);
+        logger_.info("Ressource erfolgreich geladen: {}", resourceId);
         return true;
-    }
-    catch (const ResourceException& e) {
-        Logger("ResourceManager").error("Ressourcen-Fehler: {}", e.what());
-        return false;
-    }
-    catch (const std::exception& e) {
-        Logger("ResourceManager").error("Unerwarteter Fehler beim Laden der Ressource: {}", e.what());
+    } catch (const std::exception& e) {
+        logger_.error("Fehler beim Laden der Ressource: {}", e.what());
         return false;
     }
 }
@@ -109,13 +150,11 @@ void ResourceManager::unloadResource(const std::string& resourceId) {
     try {
         auto it = resources.find(resourceId);
         if (it != resources.end()) {
-            cleanupResource(it->second);
             resources.erase(it);
-            Logger("ResourceManager").info("Ressource erfolgreich entladen: {}", resourceId);
+            logger_.info("Ressource erfolgreich entladen: {}", resourceId);
         }
-    }
-    catch (const std::exception& e) {
-        Logger("ResourceManager").error("Fehler beim Entladen der Ressource '{}': {}", resourceId, e.what());
+    } catch (const std::exception& e) {
+        logger_.error("Fehler beim Entladen der Ressource '{}': {}", resourceId, e.what());
     }
 }
 
@@ -127,55 +166,25 @@ void ResourceManager::unloadAllResources() {
     }
 
     try {
-        for (auto& [resourceId, info] : resources) {
-            cleanupResource(info);
-        }
         resources.clear();
-        Logger("ResourceManager").info("Alle Ressourcen erfolgreich entladen");
+        logger_.info("Alle Ressourcen erfolgreich entladen");
+    } catch (const std::exception& e) {
+        logger_.error("Fehler beim Entladen aller Ressourcen: {}", e.what());
     }
-    catch (const std::exception& e) {
-        Logger("ResourceManager").error("Fehler beim Entladen aller Ressourcen: {}", e.what());
-    }
-}
-
-std::vector<std::string> ResourceManager::getLoadedResources() const {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    std::vector<std::string> resourceIds;
-    resourceIds.reserve(resources.size());
-    
-    for (const auto& [resourceId, _] : resources) {
-        resourceIds.push_back(resourceId);
-    }
-    
-    return resourceIds;
-}
-
-ResourceData ResourceManager::getResource(const std::string& resourceId) const {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    auto it = resources.find(resourceId);
-    if (it != resources.end() && it->second.isLoaded) {
-        return it->second.data;
-    }
-    throw ResourceException("Ressource nicht gefunden oder nicht geladen: " + resourceId);
 }
 
 bool ResourceManager::isResourceLoaded(const std::string& resourceId) const {
     std::lock_guard<std::mutex> lock(mutex);
-    auto it = resources.find(resourceId);
-    return it != resources.end() && it->second.isLoaded;
+    return resources.find(resourceId) != resources.end();
 }
 
-void ResourceManager::update() {
+const ResourceInfo& ResourceManager::getResourceInfo(const std::string& resourceId) const {
     std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!initialized) {
-        return;
+    auto it = resources.find(resourceId);
+    if (it == resources.end()) {
+        throw ResourceException("Ressource nicht gefunden: " + resourceId);
     }
-
-    // Hier können periodische Aktualisierungen der Ressourcen durchgeführt werden
-    // z.B. Überprüfung auf Änderungen, Neuladen bei Bedarf, etc.
+    return it->second;
 }
 
 bool ResourceManager::validateResource(const std::string& resourcePath) const {
@@ -190,118 +199,11 @@ bool ResourceManager::validateResource(const std::string& resourcePath) const {
         }
 
         return true;
-    }
-    catch (const std::exception& e) {
-        Logger("ResourceManager").error("Fehler bei der Ressourcen-Validierung: {}", e.what());
+    } catch (const std::exception& e) {
+        logger_.error("Fehler bei der Ressourcen-Validierung: {}", e.what());
         return false;
     }
 }
 
-std::string ResourceManager::generateResourceId(const std::string& resourcePath) const {
-    try {
-        return std::filesystem::path(resourcePath).stem().string();
-    }
-    catch (const std::exception& e) {
-        Logger("ResourceManager").error("Fehler bei der Ressourcen-ID-Generierung: {}", e.what());
-        return "";
-    }
-}
-
-ResourceData ResourceManager::loadResourceData(const std::string& resourcePath) const {
-    try {
-        std::string extension = std::filesystem::path(resourcePath).extension().string();
-        
-        if (extension == ".wav" || extension == ".ogg" || extension == ".flac") {
-            SF_INFO fileInfo;
-            SNDFILE* file = sf_open(resourcePath.c_str(), SFM_READ, &fileInfo);
-            if (!file) {
-                throw ResourceLoadException("Fehler beim Öffnen der Audio-Datei: " + std::string(sf_strerror(file)));
-            }
-
-            std::vector<float> samples(fileInfo.frames * fileInfo.channels);
-            sf_readf_float(file, samples.data(), fileInfo.frames);
-            sf_close(file);
-
-            AudioResource audio;
-            audio.samples = std::move(samples);
-            audio.sampleRate = fileInfo.samplerate;
-            audio.channels = fileInfo.channels;
-            audio.format = extension.substr(1);
-            return audio;
-        }
-        else if (extension == ".png" || extension == ".jpg" || extension == ".jpeg") {
-            int width, height, channels;
-            unsigned char* data = stbi_load(resourcePath.c_str(), &width, &height, &channels, 0);
-            if (!data) {
-                throw ResourceLoadException("Fehler beim Laden des Bildes: " + std::string(stbi_failure_reason()));
-            }
-
-            ImageResource image;
-            image.data = std::vector<unsigned char>(data, data + width * height * channels);
-            image.width = width;
-            image.height = height;
-            image.channels = channels;
-            image.format = extension.substr(1);
-            stbi_image_free(data);
-            return image;
-        }
-        else if (extension == ".txt" || extension == ".json") {
-            std::ifstream file(resourcePath);
-            if (!file.is_open()) {
-                throw ResourceLoadException("Fehler beim Öffnen der Text-Datei");
-            }
-
-            std::stringstream buffer;
-            buffer << file.rdbuf();
-
-            TextResource text;
-            text.content = buffer.str();
-            text.encoding = "UTF-8";
-            return text;
-        }
-        else {
-            std::ifstream file(resourcePath, std::ios::binary);
-            if (!file.is_open()) {
-                throw ResourceLoadException("Fehler beim Öffnen der Binär-Datei");
-            }
-
-            BinaryResource binary;
-            binary.data = std::vector<unsigned char>(
-                std::istreambuf_iterator<char>(file),
-                std::istreambuf_iterator<char>()
-            );
-            binary.type = extension.substr(1);
-            return binary;
-        }
-    }
-    catch (const std::exception& e) {
-        Logger("ResourceManager").error("Fehler beim Laden der Ressourcendaten: {}", e.what());
-        throw ResourceLoadException(e.what());
-    }
-}
-
-void ResourceManager::cleanupResource(ResourceInfo& info) {
-    if (info.isLoaded) {
-        info.data = ResourceData();
-        info.isLoaded = false;
-    }
-}
-
-std::string ResourceManager::determineResourceType(const std::string& resourcePath) const {
-    auto extension = std::filesystem::path(resourcePath).extension().string();
-    
-    if (extension == ".wav" || extension == ".ogg" || extension == ".flac") {
-        return "audio";
-    }
-    else if (extension == ".png" || extension == ".jpg" || extension == ".jpeg") {
-        return "image";
-    }
-    else if (extension == ".txt" || extension == ".json") {
-        return "text";
-    }
-    else {
-        return "binary";
-    }
-}
-
-} // namespace VR_DAW 
+} // namespace Core
+} // namespace VRMusicStudio 

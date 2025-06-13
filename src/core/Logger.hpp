@@ -1,65 +1,79 @@
 #pragma once
 
-#include <string>
-#include <fstream>
-#include <mutex>
-#include <memory>
 #include <spdlog/spdlog.h>
+#include <memory>
+#include <string>
 
-namespace VR_DAW {
+namespace VRMusicStudio {
+namespace Core {
+
+enum class LogLevel {
+    Trace = SPDLOG_LEVEL_TRACE,
+    Debug = SPDLOG_LEVEL_DEBUG,
+    Info = SPDLOG_LEVEL_INFO,
+    Warn = SPDLOG_LEVEL_WARN,
+    Error = SPDLOG_LEVEL_ERROR,
+    Critical = SPDLOG_LEVEL_CRITICAL,
+    Off = SPDLOG_LEVEL_OFF
+};
 
 class Logger {
 public:
-    explicit Logger(const std::string& name);
-    ~Logger();
-
-    // Logging-Methoden
+    static Logger& getInstance();
+    
+    void initialize(const std::string& logFile = "vrmusicstudio.log");
+    void shutdown();
+    
+    void setLogLevel(LogLevel level);
+    LogLevel getLogLevel() const;
+    void flush();
+    
     template<typename... Args>
-    void trace(const std::string& fmt, Args&&... args) {
-        logger->trace(fmt, std::forward<Args>(args)...);
+    void trace(const char* fmt, const Args&... args) {
+        logger_->trace(fmt, args...);
+    }
+    
+    template<typename... Args>
+    void debug(const char* fmt, const Args&... args) {
+        logger_->debug(fmt, args...);
+    }
+    
+    template<typename... Args>
+    void info(const char* fmt, const Args&... args) {
+        logger_->info(fmt, args...);
+    }
+    
+    template<typename... Args>
+    void warn(const char* fmt, const Args&... args) {
+        logger_->warn(fmt, args...);
+    }
+    
+    template<typename... Args>
+    void error(const char* fmt, const Args&... args) {
+        logger_->error(fmt, args...);
+    }
+    
+    template<typename... Args>
+    void critical(const char* fmt, const Args&... args) {
+        logger_->critical(fmt, args...);
     }
 
-    template<typename... Args>
-    void debug(const std::string& fmt, Args&&... args) {
-        logger->debug(fmt, std::forward<Args>(args)...);
-    }
+    void info(const std::string& msg);
+    void error(const std::string& msg);
 
-    template<typename... Args>
-    void info(const std::string& fmt, Args&&... args) {
-        logger->info(fmt, std::forward<Args>(args)...);
-    }
-
-    template<typename... Args>
-    void warn(const std::string& fmt, Args&&... args) {
-        logger->warn(fmt, std::forward<Args>(args)...);
-    }
-
-    template<typename... Args>
-    void error(const std::string& fmt, Args&&... args) {
-        logger->error(fmt, std::forward<Args>(args)...);
-    }
-
-    template<typename... Args>
-    void critical(const std::string& fmt, Args&&... args) {
-        logger->critical(fmt, std::forward<Args>(args)...);
-    }
-
-    // Konfiguration
-    void setLogLevel(spdlog::level::level_enum level);
-    void setLogFile(const std::string& filePath);
-    void setConsoleOutput(bool enable);
-    void setFileOutput(bool enable);
+    // Verhindere Kopieren und Verschieben
+    Logger(const Logger&) = delete;
+    Logger& operator=(const Logger&) = delete;
+    Logger(Logger&&) = delete;
+    Logger& operator=(Logger&&) = delete;
 
 private:
-    std::shared_ptr<spdlog::logger> logger;
-    std::string name;
-    std::string logFilePath;
-    bool consoleOutput;
-    bool fileOutput;
-    std::mutex mutex;
-
+    Logger();
+    ~Logger();
+    
+    std::shared_ptr<spdlog::logger> logger_;
     void initializeLogger();
-    void updateLogger();
 };
 
-} // namespace VR_DAW 
+} // namespace Core
+} // namespace VRMusicStudio 

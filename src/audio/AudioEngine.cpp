@@ -1,12 +1,18 @@
 #include "AudioEngine.hpp"
+#include "core/Logger.hpp"
 #include <stdexcept>
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <algorithm>
 #include <cmath>
-<<<<<<< HEAD
+#include <spdlog/spdlog.h>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <portaudio.h>
 
-namespace VR_DAW {
+namespace VRMusicStudio {
+namespace Audio {
 
 AudioEngine& AudioEngine::getInstance() {
     static AudioEngine instance;
@@ -14,316 +20,270 @@ AudioEngine& AudioEngine::getInstance() {
 }
 
 AudioEngine::AudioEngine()
-    : stream(nullptr)
-    , sampleRate(44100.0)
-    , running(false)
-    , logger("AudioEngine")
-    , listenerPosition(0.0f)
-    , listenerOrientation(1.0f, 0.0f, 0.0f, 0.0f)
-    , isRecording(false)
+    : isInitialized(false)
     , isPlaying(false)
-    , playbackPosition(0.0)
-{
-    initializeComponents();
+    , currentPosition(0.0)
+    , stream(nullptr)
+    , sampleRate(44100.0)
+    , bufferSize(1024)
+    , inputDevice(-1)
+    , outputDevice(-1)
+    , paStream(nullptr)
+    , jackClient(nullptr)
+    , jackInputPort(nullptr)
+    , jackOutputPort(nullptr) {
+    initialize();
 }
-=======
-#include <spdlog/spdlog.h>
-#include <thread>
-#include <mutex>
-#include <condition_variable>
-
-namespace VRMusicStudio {
-
-struct AudioEngine::Impl {
-    PaStream* stream;
-    int sampleRate;
-    int bufferSize;
-    int numChannels;
-    
-    std::map<std::string, AudioTrack> tracks;
-    std::map<std::string, AudioEffect> effects;
-    std::map<std::string, AudioBus> buses;
-    std::map<std::string, AudioDevice> devices;
-    
-    bool isPlaying;
-    bool isPaused;
-    double currentPosition;
-    
-    std::function<void(const juce::AudioBuffer<float>&)> processCallback;
-    std::function<void(const juce::MidiMessage&)> midiCallback;
-    std::function<void(const std::string&)> errorCallback;
-    
-    std::mutex audioMutex;
-    std::condition_variable audioCV;
-    std::thread audioThread;
-    bool isProcessing;
-    
-    std::vector<MIDIDevice> midiDevices;
-    std::string currentMidiInputDevice;
-    std::string currentMidiOutputDevice;
-    
-    struct {
-        float x, y, z;
-        float yaw, pitch, roll;
-    } listener;
-    
-    Impl() : stream(nullptr), sampleRate(44100), bufferSize(1024), numChannels(2),
-             isPlaying(false), isPaused(false), currentPosition(0.0), isProcessing(false) {
-        listener = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
-    }
-};
-
-AudioEngine::AudioEngine() : pImpl(std::make_unique<Impl>()) {}
->>>>>>> 0dff1c4 (init 2)
 
 AudioEngine::~AudioEngine() {
     shutdown();
 }
 
-<<<<<<< HEAD
-void AudioEngine::initialize() {
-    try {
-        initializeComponents();
-        updateState();
-        validateState();
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void AudioEngine::update() {
-    try {
-        updateState();
-        processAudioToChannels();
-        processChannelsToEffects();
-        processEffectsToOutput();
-        updateParameters();
-        updateAnalysis();
-        generateVisualization();
-        validateState();
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void AudioEngine::shutdown() {
-    try {
-        state.channelBuffers.clear();
-        state.effectBuffers.clear();
-        state.channelVolumes.clear();
-        state.channelPans.clear();
-        state.channelMutes.clear();
-        state.channelSolos.clear();
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-=======
 bool AudioEngine::initialize() {
-    if (!initializePortAudio()) {
-        if (pImpl->errorCallback) {
-            pImpl->errorCallback("Failed to initialize PortAudio");
-        }
-        return false;
-    }
-    
-    if (!initializeJUCE()) {
-        if (pImpl->errorCallback) {
-            pImpl->errorCallback("Failed to initialize JUCE");
-        }
-        return false;
-    }
-    
-    pImpl->isProcessing = true;
-    pImpl->audioThread = std::thread([this]() {
-        while (pImpl->isProcessing) {
-            std::unique_lock<std::mutex> lock(pImpl->audioMutex);
-            pImpl->audioCV.wait(lock, [this]() { return !pImpl->isPlaying || !pImpl->isProcessing; });
-            
-            if (pImpl->isPlaying && !pImpl->isPaused) {
-                juce::AudioBuffer<float> inputBuffer(pImpl->numChannels, pImpl->bufferSize);
-                juce::AudioBuffer<float> outputBuffer(pImpl->numChannels, pImpl->bufferSize);
-                
-                processAudio(inputBuffer, outputBuffer);
-                
-                if (pImpl->processCallback) {
-                    pImpl->processCallback(outputBuffer);
-                }
-                
-                pImpl->currentPosition += static_cast<double>(pImpl->bufferSize) / pImpl->sampleRate;
-            }
-        }
-    });
-    
-    return true;
-}
+    if (isInitialized) return true;
 
-void AudioEngine::shutdown() {
-    if (pImpl->isProcessing) {
-        pImpl->isProcessing = false;
-        pImpl->audioCV.notify_all();
-        if (pImpl->audioThread.joinable()) {
-            pImpl->audioThread.join();
-        }
-    }
-    
-    if (pImpl->stream) {
-        Pa_StopStream(pImpl->stream);
-        Pa_CloseStream(pImpl->stream);
-        pImpl->stream = nullptr;
-    }
-    
-    Pa_Terminate();
->>>>>>> 0dff1c4 (init 2)
-}
-
-bool AudioEngine::initializePortAudio() {
     PaError err = Pa_Initialize();
     if (err != paNoError) {
-<<<<<<< HEAD
-        logger.error("Fehler bei der PortAudio-Initialisierung: {}", Pa_GetErrorText(err));
-        return false;
+        throw std::runtime_error("Failed to initialize PortAudio: " + std::string(Pa_GetErrorText(err)));
     }
+
+    // Audio-Stream konfigurieren
+    PaStreamParameters inputParameters;
+    PaStreamParameters outputParameters;
+    
+    inputParameters.device = (inputDevice >= 0) ? inputDevice : Pa_GetDefaultInputDevice();
+    inputParameters.channelCount = 2;
+    inputParameters.sampleFormat = paFloat32;
+    inputParameters.suggestedLatency = Pa_GetDeviceInfo(inputParameters.device)->defaultLowInputLatency;
+    
+    outputParameters.device = (outputDevice >= 0) ? outputDevice : Pa_GetDefaultOutputDevice();
+    outputParameters.channelCount = 2;
+    outputParameters.sampleFormat = paFloat32;
+    outputParameters.suggestedLatency = Pa_GetDeviceInfo(outputParameters.device)->defaultLowOutputLatency;
+
+    // Stream öffnen
+    err = Pa_OpenStream(&stream,
+                       &inputParameters,
+                       &outputParameters,
+                       sampleRate,
+                       bufferSize,
+                       paClipOff | paDitherOff,
+                       nullptr,
+                       nullptr);
+
+    if (err != paNoError) {
+        throw std::runtime_error("Failed to open audio stream: " + std::string(Pa_GetErrorText(err)));
+    }
+
+    isInitialized = true;
     return true;
 }
 
-void AudioEngine::shutdownPortAudio() {
-    PaError err = Pa_Terminate();
-    if (err != paNoError) {
-        logger.error("Fehler beim Beenden von PortAudio: {}", Pa_GetErrorText(err));
+void AudioEngine::shutdown() {
+    if (!isInitialized) return;
+
+    if (isPlaying) {
+        stop();
     }
+
+    PaError err = Pa_CloseStream(stream);
+    if (err != paNoError) {
+        throw std::runtime_error("Failed to close audio stream: " + std::string(Pa_GetErrorText(err)));
+    }
+
+    err = Pa_Terminate();
+    if (err != paNoError) {
+        throw std::runtime_error("Failed to terminate PortAudio: " + std::string(Pa_GetErrorText(err)));
+    }
+
+    isInitialized = false;
 }
 
-bool AudioEngine::start() {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!running || !stream) {
-        return false;
+void AudioEngine::start() {
+    if (!isInitialized || isPlaying) return;
+
+    PaError err = Pa_StartStream(stream);
+    if (err != paNoError) {
+        throw std::runtime_error("Failed to start audio stream: " + std::string(Pa_GetErrorText(err)));
     }
 
-    try {
-        PaError err = Pa_StartStream(stream);
-        if (err != paNoError) {
-            logger.error("Fehler beim Starten des Audio-Streams: {}", Pa_GetErrorText(err));
-            return false;
-        }
-
-        logger.info("Audio-Stream erfolgreich gestartet");
-        return true;
-    }
-    catch (const std::exception& e) {
-        logger.error("Fehler beim Starten des Audio-Streams: {}", e.what());
-        return false;
-    }
+    isPlaying = true;
 }
 
 void AudioEngine::stop() {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!stream) {
-        return;
+    if (!isInitialized || !isPlaying) return;
+
+    PaError err = Pa_StopStream(stream);
+    if (err != paNoError) {
+        throw std::runtime_error("Failed to stop audio stream: " + std::string(Pa_GetErrorText(err)));
     }
 
-    try {
-        PaError err = Pa_StopStream(stream);
-        if (err != paNoError) {
-            logger.error("Fehler beim Stoppen des Audio-Streams: {}", Pa_GetErrorText(err));
-            return;
+    isPlaying = false;
+}
+
+void AudioEngine::processAudio(float* inputBuffer, float* outputBuffer, unsigned long framesPerBuffer) {
+    if (!isInitialized) return;
+
+    // Audio-Verarbeitung für alle Tracks
+    for (auto& track : audioTracks) {
+        if (!track.isMuted && (track.isSolo || !anyTrackSolo())) {
+            // Track-Audio verarbeiten
+            processTrack(track, inputBuffer, outputBuffer, framesPerBuffer);
         }
-
-        logger.info("Audio-Stream erfolgreich gestoppt");
-    }
-    catch (const std::exception& e) {
-        logger.error("Fehler beim Stoppen des Audio-Streams: {}", e.what());
-    }
-}
-
-bool AudioEngine::isRunning() const {
-    std::lock_guard<std::mutex> lock(mutex);
-    return running && stream && Pa_IsStreamActive(stream) == 1;
-}
-
-bool AudioEngine::createStream(int inputChannels, int outputChannels, double sampleRate) {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!running) {
-        return false;
     }
 
-    try {
-        closeStream();
-
-        PaStreamParameters inputParameters;
-        inputParameters.device = Pa_GetDefaultInputDevice();
-        inputParameters.channelCount = inputChannels;
-        inputParameters.sampleFormat = paFloat32;
-        inputParameters.suggestedLatency = Pa_GetDeviceInfo(inputParameters.device)->defaultLowInputLatency;
-        inputParameters.hostApiSpecificStreamInfo = nullptr;
-
-        PaStreamParameters outputParameters;
-        outputParameters.device = Pa_GetDefaultOutputDevice();
-        outputParameters.channelCount = outputChannels;
-        outputParameters.sampleFormat = paFloat32;
-        outputParameters.suggestedLatency = Pa_GetDeviceInfo(outputParameters.device)->defaultLowOutputLatency;
-        outputParameters.hostApiSpecificStreamInfo = nullptr;
-
-        PaError err = Pa_OpenStream(&stream,
-                                  &inputParameters,
-                                  &outputParameters,
-                                  sampleRate,
-                                  paFramesPerBufferUnspecified,
-                                  paClipOff,
-                                  paCallback,
-                                  this);
-
-        if (err != paNoError) {
-            logger.error("Fehler beim Öffnen des Audio-Streams: {}", Pa_GetErrorText(err));
-            return false;
+    // MIDI-Tracks verarbeiten
+    for (auto& track : midiTracks) {
+        if (!track.isMuted && (track.isSolo || !anyTrackSolo())) {
+            // MIDI-Daten verarbeiten
+            processMidiTrack(track, framesPerBuffer);
         }
-
-        this->sampleRate = sampleRate;
-        logger.info("Audio-Stream erfolgreich erstellt");
-        return true;
     }
-    catch (const std::exception& e) {
-        logger.error("Fehler beim Erstellen des Audio-Streams: {}", e.what());
-        return false;
+
+    // VR-Positionierung und 3D-Audio
+    processVRAudio(outputBuffer, framesPerBuffer);
+
+    // Automation
+    processAutomation(framesPerBuffer);
+
+    // Effekte
+    processEffects(outputBuffer, framesPerBuffer);
+
+    // Mixing
+    processMixing(outputBuffer, framesPerBuffer);
+}
+
+void AudioEngine::processTrack(const AudioTrack& track, float* inputBuffer, float* outputBuffer, unsigned long framesPerBuffer) {
+    // Track-Audio mit Plugins verarbeiten
+    for (auto& plugin : track.plugins) {
+        if (!plugin->isBypassed()) {
+            plugin->processAudio(outputBuffer, framesPerBuffer);
+        }
     }
 }
 
-void AudioEngine::closeStream() {
-    if (stream) {
-        Pa_CloseStream(stream);
-        stream = nullptr;
+void AudioEngine::processMidiTrack(const MidiTrack& track, unsigned long framesPerBuffer) {
+    // MIDI-Daten verarbeiten und an Plugins weiterleiten
+    for (auto& plugin : track.plugins) {
+        if (!plugin->isBypassed()) {
+            plugin->processMidi(track.data);
+        }
     }
 }
 
-void AudioEngine::processAudio(const float* input, float* output, unsigned long framesPerBuffer) {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!running) {
-        return;
-    }
-
-    try {
-        // Hier wird die Audio-Verarbeitung durchgeführt
-        // z.B. Plugin-Verarbeitung, Effekte, etc.
+void AudioEngine::processVRAudio(float* outputBuffer, unsigned long framesPerBuffer) {
+    // 3D-Audio basierend auf VR-Positionierung
+    for (unsigned long i = 0; i < framesPerBuffer; i += 2) {
+        // HRTF oder Ambisonics für 3D-Audio
+        float left = outputBuffer[i];
+        float right = outputBuffer[i + 1];
         
-        // Vorläufig: Direktes Durchreichen des Audiosignals
-        for (unsigned long i = 0; i < framesPerBuffer; ++i) {
-            output[i] = input[i];
-        }
-    }
-    catch (const std::exception& e) {
-        logger.error("Fehler bei der Audio-Verarbeitung: {}", e.what());
+        // VR-Positionierung anwenden
+        glm::vec3 listenerPosition = getListenerPosition();
+        glm::vec3 sourcePosition = getSourcePosition();
+        float distance = glm::distance(listenerPosition, sourcePosition);
+        float attenuation = 1.0f / (1.0f + distance);
+        
+        outputBuffer[i] = left * attenuation;
+        outputBuffer[i + 1] = right * attenuation;
     }
 }
 
-void AudioEngine::setSampleRate(double rate) {
+void AudioEngine::processAutomation(unsigned long framesPerBuffer) {
+    // Automation-Punkte verarbeiten
+    for (auto& [parameter, points] : automationPoints) {
+        float currentTime = currentPosition;
+        float value = interpolateAutomationValue(points, currentTime);
+        setParameter(parameter, value);
+    }
+}
+
+void AudioEngine::processEffects(float* outputBuffer, unsigned long framesPerBuffer) {
+    // Effekte auf den Mix anwenden
+    for (auto& effect : effects) {
+        if (!effect->isBypassed()) {
+            effect->processAudio(outputBuffer, framesPerBuffer);
+        }
+    }
+}
+
+void AudioEngine::processMixing(float* outputBuffer, unsigned long framesPerBuffer) {
+    // Finales Mixing mit Volume, Pan, etc.
+    for (unsigned long i = 0; i < framesPerBuffer; i += 2) {
+        float left = outputBuffer[i];
+        float right = outputBuffer[i + 1];
+        
+        // Volume
+        left *= masterVolume;
+        right *= masterVolume;
+        
+        // Pan
+        float pan = masterPan;
+        float leftGain = std::cos(pan * M_PI / 2.0f);
+        float rightGain = std::sin(pan * M_PI / 2.0f);
+        
+        outputBuffer[i] = left * leftGain;
+        outputBuffer[i + 1] = right * rightGain;
+    }
+}
+
+bool AudioEngine::anyTrackSolo() const {
+    return std::any_of(audioTracks.begin(), audioTracks.end(),
+                      [](const AudioTrack& track) { return track.isSolo; });
+}
+
+float AudioEngine::interpolateAutomationValue(const std::vector<AutomationPoint>& points, float time) {
+    if (points.empty()) return 0.0f;
+    if (points.size() == 1) return points[0].value;
+    
+    // Finde die umgebenden Punkte
+    auto it = std::lower_bound(points.begin(), points.end(), time,
+                              [](const AutomationPoint& point, float t) {
+                                  return point.time < t;
+                              });
+    
+    if (it == points.begin()) return points.front().value;
+    if (it == points.end()) return points.back().value;
+    
+    // Lineare Interpolation
+    const AutomationPoint& p1 = *(it - 1);
+    const AutomationPoint& p2 = *it;
+    float t = (time - p1.time) / (p2.time - p1.time);
+    return p1.value + t * (p2.value - p1.value);
+}
+
+glm::vec3 AudioEngine::getListenerPosition() const {
+    // VR-Listener-Position aus der VR-Engine holen
+    return glm::vec3(0.0f); // Dummy
+}
+
+glm::vec3 AudioEngine::getSourcePosition() const {
+    // Audio-Source-Position aus der VR-Engine holen
+    return glm::vec3(0.0f); // Dummy
+}
+
+void AudioEngine::update() {
     std::lock_guard<std::mutex> lock(mutex);
-    sampleRate = rate;
+
+    if (!isInitialized || !isPlaying) {
+        return;
+    }
+
+    try {
+        // Audio-Update-Logik hier implementieren
+    } catch (const std::exception& e) {
+        spdlog::error("Fehler im Audio-Update: {}", e.what());
+    }
+}
+
+bool AudioEngine::isStreamActive() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return isPlaying;
+}
+
+void AudioEngine::setSampleRate(double newSampleRate) {
+    std::lock_guard<std::mutex> lock(mutex);
+    sampleRate = newSampleRate;
 }
 
 double AudioEngine::getSampleRate() const {
@@ -331,60 +291,64 @@ double AudioEngine::getSampleRate() const {
     return sampleRate;
 }
 
-bool AudioEngine::addPlugin(const std::string& pluginId) {
+void AudioEngine::setBufferSize(unsigned int newBufferSize) {
     std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!running) {
-        return false;
-    }
-
-    try {
-        activePlugins.push_back(pluginId);
-        logger.info("Plugin hinzugefügt: {}", pluginId);
-        return true;
-    }
-    catch (const std::exception& e) {
-        logger.error("Fehler beim Hinzufügen des Plugins: {}", e.what());
-        return false;
-    }
+    bufferSize = newBufferSize;
 }
 
-bool AudioEngine::removePlugin(const std::string& pluginId) {
+unsigned int AudioEngine::getBufferSize() const {
     std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!running) {
-        return false;
-    }
+    return bufferSize;
+}
 
-    try {
-        auto it = std::find(activePlugins.begin(), activePlugins.end(), pluginId);
-        if (it != activePlugins.end()) {
-            activePlugins.erase(it);
-            logger.info("Plugin entfernt: {}", pluginId);
-            return true;
+void AudioEngine::setInputDevice(int deviceId) {
+    std::lock_guard<std::mutex> lock(mutex);
+    inputDevice = deviceId;
+}
+
+void AudioEngine::setOutputDevice(int deviceId) {
+    std::lock_guard<std::mutex> lock(mutex);
+    outputDevice = deviceId;
+}
+
+int AudioEngine::getInputDevice() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return inputDevice;
+}
+
+int AudioEngine::getOutputDevice() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return outputDevice;
+}
+
+std::vector<std::string> AudioEngine::getAvailableInputDevices() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    std::vector<std::string> devices;
+
+    int numDevices = Pa_GetDeviceCount();
+    for (int i = 0; i < numDevices; i++) {
+        const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(i);
+        if (deviceInfo->maxInputChannels > 0) {
+            devices.push_back(deviceInfo->name);
         }
-        return false;
     }
-    catch (const std::exception& e) {
-        logger.error("Fehler beim Entfernen des Plugins: {}", e.what());
-        return false;
-    }
+
+    return devices;
 }
 
-void AudioEngine::updatePlugins() {
+std::vector<std::string> AudioEngine::getAvailableOutputDevices() const {
     std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!running) {
-        return;
+    std::vector<std::string> devices;
+
+    int numDevices = Pa_GetDeviceCount();
+    for (int i = 0; i < numDevices; i++) {
+        const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(i);
+        if (deviceInfo->maxOutputChannels > 0) {
+            devices.push_back(deviceInfo->name);
+        }
     }
 
-    try {
-        // Hier werden die aktiven Plugins aktualisiert
-        // z.B. Parameter-Änderungen, Status-Updates, etc.
-    }
-    catch (const std::exception& e) {
-        logger.error("Fehler beim Aktualisieren der Plugins: {}", e.what());
-    }
+    return devices;
 }
 
 int AudioEngine::paCallback(const void* inputBuffer, void* outputBuffer,
@@ -392,969 +356,106 @@ int AudioEngine::paCallback(const void* inputBuffer, void* outputBuffer,
                            const PaStreamCallbackTimeInfo* timeInfo,
                            PaStreamCallbackFlags statusFlags,
                            void* userData) {
-    auto* engine = static_cast<AudioEngine*>(userData);
-    const float* input = static_cast<const float*>(inputBuffer);
-    float* output = static_cast<float*>(outputBuffer);
+    (void)timeInfo;
+    (void)statusFlags;
 
-    engine->processAudio(input, output, framesPerBuffer);
+    auto* engine = static_cast<AudioEngine*>(userData);
+    if (!engine) {
+        return paAbort;
+    }
+
+    // Audio-Verarbeitung hier implementieren
+    const float* in = static_cast<const float*>(inputBuffer);
+    float* out = static_cast<float*>(outputBuffer);
+
+    for (unsigned long i = 0; i < framesPerBuffer; i++) {
+        out[i] = in[i];  // Einfaches Pass-Through
+    }
+
     return paContinue;
 }
 
-void AudioEngine::setListenerPosition(const glm::vec3& position) {
-    std::lock_guard<std::mutex> lock(mutex);
-    listenerPosition = position;
-    update3DAudio();
-}
-
-void AudioEngine::setListenerOrientation(const glm::quat& orientation) {
-    std::lock_guard<std::mutex> lock(mutex);
-    listenerOrientation = orientation;
-    update3DAudio();
-}
-
-void AudioEngine::setSourcePosition(const std::string& sourceId, const glm::vec3& position) {
-    std::lock_guard<std::mutex> lock(mutex);
-    sourcePositions[sourceId] = position;
-    update3DAudio();
-}
-
-void AudioEngine::setSourceOrientation(const std::string& sourceId, const glm::quat& orientation) {
-    std::lock_guard<std::mutex> lock(mutex);
-    sourceOrientations[sourceId] = orientation;
-    update3DAudio();
-}
-
-std::shared_ptr<AudioTrack> AudioEngine::createAudioTrack(const std::string& name) {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!running) {
-        return nullptr;
-    }
-
-    try {
-        auto track = std::make_shared<AudioTrack>();
-        track->id = "track_" + std::to_string(audioTracks.size());
-        track->name = name;
-        track->volume = 1.0f;
-        track->isMuted = false;
-        track->isSolo = false;
-        
-        audioTracks.push_back(track);
-        logger.info("Audio-Track erstellt: {}", name);
-        return track;
-    }
-    catch (const std::exception& e) {
-        logger.error("Fehler beim Erstellen des Audio-Tracks: {}", e.what());
-        return nullptr;
-    }
-}
-
-std::shared_ptr<MidiTrack> AudioEngine::createMidiTrack(const std::string& name) {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!running) {
-        return nullptr;
-    }
-
-    try {
-        auto track = std::make_shared<MidiTrack>();
-        track->id = "midi_" + std::to_string(midiTracks.size());
-        track->name = name;
-        track->isMuted = false;
-        track->isSolo = false;
-        
-        midiTracks.push_back(track);
-        logger.info("MIDI-Track erstellt: {}", name);
-        return track;
-    }
-    catch (const std::exception& e) {
-        logger.error("Fehler beim Erstellen des MIDI-Tracks: {}", e.what());
-        return nullptr;
-    }
-}
-
-void AudioEngine::removeTrack(const std::string& trackId) {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!running) {
-        return;
-    }
-
-    try {
-        // Audio-Track suchen und entfernen
-        auto audioIt = std::find_if(audioTracks.begin(), audioTracks.end(),
-            [&trackId](const auto& track) { return track->id == trackId; });
-        
-        if (audioIt != audioTracks.end()) {
-            audioTracks.erase(audioIt);
-            logger.info("Audio-Track entfernt: {}", trackId);
-            return;
-        }
-
-        // MIDI-Track suchen und entfernen
-        auto midiIt = std::find_if(midiTracks.begin(), midiTracks.end(),
-            [&trackId](const auto& track) { return track->id == trackId; });
-        
-        if (midiIt != midiTracks.end()) {
-            midiTracks.erase(midiIt);
-            logger.info("MIDI-Track entfernt: {}", trackId);
-        }
-    }
-    catch (const std::exception& e) {
-        logger.error("Fehler beim Entfernen des Tracks: {}", e.what());
-    }
-}
-
-std::shared_ptr<AudioTrack> AudioEngine::getAudioTrack(const std::string& trackId) {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    auto it = std::find_if(audioTracks.begin(), audioTracks.end(),
-        [&trackId](const auto& track) { return track->id == trackId; });
-    
-    return (it != audioTracks.end()) ? *it : nullptr;
-}
-
-std::shared_ptr<MidiTrack> AudioEngine::getMidiTrack(const std::string& trackId) {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    auto it = std::find_if(midiTracks.begin(), midiTracks.end(),
-        [&trackId](const auto& track) { return track->id == trackId; });
-    
-    return (it != midiTracks.end()) ? *it : nullptr;
-}
-
-bool AudioEngine::addPluginToTrack(const std::string& trackId, const std::string& pluginId) {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!running) {
-        return false;
-    }
-
-    try {
-        // Plugin laden
-        auto plugin = PluginLoader::loadPlugin(pluginId);
-        if (!plugin) {
-            logger.error("Fehler beim Laden des Plugins: {}", pluginId);
-            return false;
-        }
-
-        // Audio-Track suchen
-        auto audioTrack = getAudioTrack(trackId);
-        if (audioTrack) {
-            audioTrack->plugins.push_back(plugin);
-            logger.info("Plugin zu Audio-Track hinzugefügt: {}", trackId);
-            return true;
-        }
-
-        // MIDI-Track suchen
-        auto midiTrack = getMidiTrack(trackId);
-        if (midiTrack) {
-            midiTrack->plugins.push_back(plugin);
-            logger.info("Plugin zu MIDI-Track hinzugefügt: {}", trackId);
-            return true;
-        }
-
-        logger.error("Track nicht gefunden: {}", trackId);
-        return false;
-    }
-    catch (const std::exception& e) {
-        logger.error("Fehler beim Hinzufügen des Plugins: {}", e.what());
-        return false;
-    }
-}
-
-bool AudioEngine::removePluginFromTrack(const std::string& trackId, const std::string& pluginId) {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!running) {
-        return false;
-    }
-
-    try {
-        // Audio-Track suchen
-        auto audioTrack = getAudioTrack(trackId);
-        if (audioTrack) {
-            auto it = std::find_if(audioTrack->plugins.begin(), audioTrack->plugins.end(),
-                [&pluginId](const auto& plugin) { return plugin->getInfo().id == pluginId; });
-            
-            if (it != audioTrack->plugins.end()) {
-                audioTrack->plugins.erase(it);
-                logger.info("Plugin von Audio-Track entfernt: {}", trackId);
-                return true;
-            }
-        }
-
-        // MIDI-Track suchen
-        auto midiTrack = getMidiTrack(trackId);
-        if (midiTrack) {
-            auto it = std::find_if(midiTrack->plugins.begin(), midiTrack->plugins.end(),
-                [&pluginId](const auto& plugin) { return plugin->getInfo().id == pluginId; });
-            
-            if (it != midiTrack->plugins.end()) {
-                midiTrack->plugins.erase(it);
-                logger.info("Plugin von MIDI-Track entfernt: {}", trackId);
-                return true;
-            }
-        }
-
-        logger.error("Track oder Plugin nicht gefunden: {} / {}", trackId, pluginId);
-        return false;
-    }
-    catch (const std::exception& e) {
-        logger.error("Fehler beim Entfernen des Plugins: {}", e.what());
-        return false;
-    }
-}
-
-bool AudioEngine::startRecording(const std::string& trackId) {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!running || isRecording) {
-        return false;
-    }
-
-    try {
-        auto track = getAudioTrack(trackId);
-        if (!track) {
-            logger.error("Track nicht gefunden: {}", trackId);
-            return false;
-        }
-
-        isRecording = true;
-        track->buffer.clear();
-        logger.info("Aufnahme gestartet für Track: {}", trackId);
-        return true;
-    }
-    catch (const std::exception& e) {
-        logger.error("Fehler beim Starten der Aufnahme: {}", e.what());
-        return false;
-    }
-}
-
-void AudioEngine::stopRecording(const std::string& trackId) {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!isRecording) {
-        return;
-    }
-
-    try {
-        isRecording = false;
-        logger.info("Aufnahme beendet für Track: {}", trackId);
-    }
-    catch (const std::exception& e) {
-        logger.error("Fehler beim Beenden der Aufnahme: {}", e.what());
-    }
-}
-
-bool AudioEngine::startPlayback() {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!running || isPlaying) {
-        return false;
-    }
-
-    try {
-        isPlaying = true;
-        playbackPosition = 0.0;
-        logger.info("Wiedergabe gestartet");
-        return true;
-    }
-    catch (const std::exception& e) {
-        logger.error("Fehler beim Starten der Wiedergabe: {}", e.what());
-        return false;
-    }
-}
-
-void AudioEngine::stopPlayback() {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!isPlaying) {
-        return;
-    }
-
-    try {
-        isPlaying = false;
-        logger.info("Wiedergabe beendet");
-    }
-    catch (const std::exception& e) {
-        logger.error("Fehler beim Beenden der Wiedergabe: {}", e.what());
-    }
-}
-
-void AudioEngine::setPlaybackPosition(double position) {
-    std::lock_guard<std::mutex> lock(mutex);
-    playbackPosition = position;
-}
-
-double AudioEngine::getPlaybackPosition() const {
-    std::lock_guard<std::mutex> lock(mutex);
-    return playbackPosition;
-}
-
-void AudioEngine::processMidiMessage(const uint8_t* data, size_t length) {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!running) {
-        return;
-    }
-
-    try {
-        for (const auto& track : midiTracks) {
-            if (!track->isMuted) {
-                for (const auto& plugin : track->plugins) {
-                    // MIDI-Daten an Plugin weiterleiten
-                    // (Implementierung hängt von der Plugin-Schnittstelle ab)
-                }
-            }
-        }
-    }
-    catch (const std::exception& e) {
-        logger.error("Fehler bei der MIDI-Verarbeitung: {}", e.what());
-    }
-}
-
-void AudioEngine::sendMidiMessage(const uint8_t* data, size_t length) {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!running) {
-        return;
-    }
-
-    try {
-        // MIDI-Daten an alle aktiven MIDI-Tracks senden
-        for (const auto& track : midiTracks) {
-            if (!track->isMuted) {
-                track->data.insert(track->data.end(), data, data + length);
-            }
-        }
-    }
-    catch (const std::exception& e) {
-        logger.error("Fehler beim Senden der MIDI-Nachricht: {}", e.what());
-    }
-}
-
-bool AudioEngine::saveProject(const std::string& path) {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!running) {
-        return false;
-    }
-
-    try {
-        nlohmann::json project;
-        
-        // Audio-Tracks speichern
-        for (const auto& track : audioTracks) {
-            nlohmann::json trackData;
-            trackData["id"] = track->id;
-            trackData["name"] = track->name;
-            trackData["volume"] = track->volume;
-            trackData["isMuted"] = track->isMuted;
-            trackData["isSolo"] = track->isSolo;
-            
-            // Plugin-IDs speichern
-            std::vector<std::string> pluginIds;
-            for (const auto& plugin : track->plugins) {
-                pluginIds.push_back(plugin->getInfo().id);
-            }
-            trackData["plugins"] = pluginIds;
-            
-            project["audioTracks"].push_back(trackData);
-        }
-        
-        // MIDI-Tracks speichern
-        for (const auto& track : midiTracks) {
-            nlohmann::json trackData;
-            trackData["id"] = track->id;
-            trackData["name"] = track->name;
-            trackData["isMuted"] = track->isMuted;
-            trackData["isSolo"] = track->isSolo;
-            
-            // Plugin-IDs speichern
-            std::vector<std::string> pluginIds;
-            for (const auto& plugin : track->plugins) {
-                pluginIds.push_back(plugin->getInfo().id);
-            }
-            trackData["plugins"] = pluginIds;
-            
-            project["midiTracks"].push_back(trackData);
-        }
-        
-        // Projekt speichern
-        std::ofstream file(path);
-        file << project.dump(4);
-        
-        currentProject = path;
-        logger.info("Projekt gespeichert: {}", path);
-        return true;
-    }
-    catch (const std::exception& e) {
-        logger.error("Fehler beim Speichern des Projekts: {}", e.what());
-        return false;
-    }
-}
-
-bool AudioEngine::loadProject(const std::string& path) {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!running) {
-        return false;
-    }
-
-    try {
-        // Altes Projekt schließen
-        closeProject();
-        
-        // Projekt laden
-        std::ifstream file(path);
-        nlohmann::json project = nlohmann::json::parse(file);
-        
-        // Audio-Tracks laden
-        for (const auto& trackData : project["audioTracks"]) {
-            auto track = createAudioTrack(trackData["name"]);
-            if (track) {
-                track->volume = trackData["volume"];
-                track->isMuted = trackData["isMuted"];
-                track->isSolo = trackData["isSolo"];
-                
-                // Plugins laden
-                for (const auto& pluginId : trackData["plugins"]) {
-                    addPluginToTrack(track->id, pluginId);
-                }
-            }
-        }
-        
-        // MIDI-Tracks laden
-        for (const auto& trackData : project["midiTracks"]) {
-            auto track = createMidiTrack(trackData["name"]);
-            if (track) {
-                track->isMuted = trackData["isMuted"];
-                track->isSolo = trackData["isSolo"];
-                
-                // Plugins laden
-                for (const auto& pluginId : trackData["plugins"]) {
-                    addPluginToTrack(track->id, pluginId);
-                }
-            }
-        }
-        
-        currentProject = path;
-        logger.info("Projekt geladen: {}", path);
-        return true;
-    }
-    catch (const std::exception& e) {
-        logger.error("Fehler beim Laden des Projekts: {}", e.what());
-        return false;
-    }
-}
-
-void AudioEngine::createNewProject() {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!running) {
-        return;
-    }
-
-    try {
-        closeProject();
-        currentProject.clear();
-        logger.info("Neues Projekt erstellt");
-    }
-    catch (const std::exception& e) {
-        logger.error("Fehler beim Erstellen eines neuen Projekts: {}", e.what());
-    }
-}
-
-void AudioEngine::closeProject() {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!running) {
-        return;
-    }
-
-    try {
-        // Aufnahme und Wiedergabe beenden
-        if (isRecording) {
-            stopRecording("");
-        }
-        if (isPlaying) {
-            stopPlayback();
-        }
-        
-        // Tracks löschen
-        audioTracks.clear();
-        midiTracks.clear();
-        
-        currentProject.clear();
-        logger.info("Projekt geschlossen");
-    }
-    catch (const std::exception& e) {
-        logger.error("Fehler beim Schließen des Projekts: {}", e.what());
-    }
-}
-
-void AudioEngine::processTrack(const std::shared_ptr<AudioTrack>& track, float* output, unsigned long framesPerBuffer) {
-    if (!track || track->isMuted) {
-        return;
-    }
-
-    // Plugin-Verarbeitung
-    for (const auto& plugin : track->plugins) {
-        plugin->processAudio(track->buffer.data(), output, framesPerBuffer);
-    }
-
-    // Volume anwenden
-    for (unsigned long i = 0; i < framesPerBuffer; ++i) {
-        output[i] *= track->volume;
-    }
-}
-
-void AudioEngine::processMidiTrack(const std::shared_ptr<MidiTrack>& track, unsigned long framesPerBuffer) {
-    if (!track || track->isMuted) {
-        return;
-    }
-
-    // MIDI-Daten verarbeiten
-    for (const auto& plugin : track->plugins) {
-        // MIDI-Daten an Plugin weiterleiten
-        // (Implementierung hängt von der Plugin-Schnittstelle ab)
-    }
-}
-
-void AudioEngine::update3DAudio() {
-    // Hier wird die 3D-Audio-Verarbeitung implementiert
-    // z.B. mit OpenAL oder einer anderen 3D-Audio-Bibliothek
-}
-
-void AudioEngine::initializeComponents() {
-    // Komponenten initialisieren
-}
-
-void AudioEngine::updateState() {
-    // State aktualisieren
-}
-
-void AudioEngine::processAudioToChannels() {
-    // Audio zu Kanälen verarbeiten
-}
-
-void AudioEngine::processChannelsToEffects() {
-    // Kanäle zu Effekten verarbeiten
-}
-
-void AudioEngine::processEffectsToOutput() {
-    // Effekte zu Ausgabe verarbeiten
-}
-
-void AudioEngine::updateParameters() {
-    // Parameter aktualisieren
-}
-
-void AudioEngine::updateAnalysis() {
-    // Analyse aktualisieren
-}
-
-void AudioEngine::generateVisualization() {
-    // Visualisierung generieren
-}
-
-void AudioEngine::validateState() {
-    if (state.channelBuffers.empty()) {
-        throw std::runtime_error("No channels initialized");
-    }
-}
-
-void AudioEngine::handleErrors() {
-    // Fehlerbehandlung
-}
-
-bool AudioEngine::validateAudioBuffer(const std::vector<float>& buffer) {
-    return !buffer.empty() && std::all_of(buffer.begin(), buffer.end(), [](float x) { return std::isfinite(x); });
-}
-
-float AudioEngine::calculateLevel(const std::vector<float>& buffer) {
-    if (buffer.empty()) return 0.0f;
-    float sum = 0.0f;
-    for (float sample : buffer) {
-        sum += sample * sample;
-    }
-    return std::sqrt(sum / buffer.size());
-}
-
-float AudioEngine::calculateSpectrum(const std::vector<float>& buffer) {
-    if (buffer.empty()) return 0.0f;
-    float sum = 0.0f;
-    for (float sample : buffer) {
-        sum += std::abs(sample);
-    }
-    return sum / buffer.size();
-}
-
-float AudioEngine::calculatePhase(const std::vector<float>& buffer) {
-    if (buffer.empty()) return 0.0f;
-    float sum = 0.0f;
-    for (size_t i = 1; i < buffer.size(); ++i) {
-        sum += std::atan2(buffer[i], buffer[i-1]);
-    }
-    return sum / (buffer.size() - 1);
-}
-
-float AudioEngine::calculateCorrelation(const std::vector<float>& leftBuffer, const std::vector<float>& rightBuffer) {
-    if (leftBuffer.empty() || rightBuffer.empty()) return 0.0f;
-    float sum = 0.0f;
-    for (size_t i = 0; i < std::min(leftBuffer.size(), rightBuffer.size()); ++i) {
-        sum += leftBuffer[i] * rightBuffer[i];
-    }
-    return sum / std::min(leftBuffer.size(), rightBuffer.size());
-}
-
-float AudioEngine::calculateDynamics(const std::vector<float>& buffer) {
-    if (buffer.empty()) return 0.0f;
-    float peak = 0.0f;
-    float rms = 0.0f;
-    for (float sample : buffer) {
-        peak = std::max(peak, std::abs(sample));
-        rms += sample * sample;
-    }
-    rms = std::sqrt(rms / buffer.size());
-    return peak / (rms + 1e-6f);
-}
-
-float AudioEngine::calculateStereo(const std::vector<float>& leftBuffer, const std::vector<float>& rightBuffer) {
-    if (leftBuffer.empty() || rightBuffer.empty()) return 0.0f;
-    float sum = 0.0f;
-    for (size_t i = 0; i < std::min(leftBuffer.size(), rightBuffer.size()); ++i) {
-        sum += std::abs(leftBuffer[i] - rightBuffer[i]);
-    }
-    return sum / std::min(leftBuffer.size(), rightBuffer.size());
-}
-
-float AudioEngine::calculateFrequency(const std::vector<float>& buffer) {
-    if (buffer.empty()) return 0.0f;
-    float sum = 0.0f;
-    for (size_t i = 1; i < buffer.size(); ++i) {
-        sum += std::abs(buffer[i] - buffer[i-1]);
+int AudioEngine::jackCallback(jack_nframes_t nframes, void* arg) {
+    auto* engine = static_cast<AudioEngine*>(arg);
+    if (!engine) {
+        return 1;
     }
-    return sum / (buffer.size() - 1) * parameters.sampleRate;
-}
 
-float AudioEngine::calculateTransient(const std::vector<float>& buffer) {
-    if (buffer.empty()) return 0.0f;
-    float sum = 0.0f;
-    for (size_t i = 2; i < buffer.size(); ++i) {
-        sum += std::abs(buffer[i] - 2.0f * buffer[i-1] + buffer[i-2]);
-    }
-    return sum / (buffer.size() - 2);
+    // JACK-Audio-Verarbeitung hier implementieren
+    return 0;
 }
 
-// Revolutionäre Audio-Verarbeitung
-void AudioEngine::AdvancedProcessing::applySpectralProcessing(
-    const std::vector<float>& input, std::vector<float>& output) {
-    
-    // Revolutionäre Spektralanalyse
-    std::vector<float> spectrum(input.size());
-    for (size_t i = 0; i < input.size(); ++i) {
-        float real = 0.0f;
-        float imag = 0.0f;
-        for (size_t j = 0; j < input.size(); ++j) {
-            float angle = 2.0f * M_PI * i * j / input.size();
-            real += input[j] * std::cos(angle);
-            imag += input[j] * std::sin(angle);
-        }
-        spectrum[i] = std::sqrt(real * real + imag * imag);
+void AudioEngine::initializePortAudio() {
+    PaError err = Pa_Initialize();
+    if (err != paNoError) {
+        throw std::runtime_error("Fehler bei der PortAudio-Initialisierung: " + std::string(Pa_GetErrorText(err)));
     }
-    
-    // Revolutionäre Spektralmanipulation
-    for (size_t i = 0; i < output.size(); ++i) {
-        float freq = static_cast<float>(i) / output.size();
-        float gain = 1.0f + 0.5f * std::sin(2.0f * M_PI * freq * 10.0f);
-        output[i] = spectrum[i] * gain;
-    }
-}
 
-void AudioEngine::AdvancedProcessing::applyDynamicProcessing(
-    const std::vector<float>& input, std::vector<float>& output) {
-    
-    // Revolutionäre Dynamikkompression
-    float threshold = 0.7f;
-    float ratio = 4.0f;
-    float attack = 0.01f;
-    float release = 0.1f;
-    
-    float envelope = 0.0f;
-    for (size_t i = 0; i < input.size(); ++i) {
-        float level = std::abs(input[i]);
-        if (level > envelope) {
-            envelope = level * attack + envelope * (1.0f - attack);
-        } else {
-            envelope = level * release + envelope * (1.0f - release);
-        }
-        
-        float gain = 1.0f;
-        if (envelope > threshold) {
-            gain = threshold + (envelope - threshold) / ratio;
-            gain = gain / envelope;
-        }
-        
-        output[i] = input[i] * gain;
-    }
-}
+    PaStreamParameters inputParameters;
+    PaStreamParameters outputParameters;
 
-void AudioEngine::AdvancedProcessing::applySpatialProcessing(
-    const std::vector<float>& input, std::vector<float>& output) {
-    
-    // Revolutionäre räumliche Verarbeitung
-    float roomSize = 0.8f;
-    float damping = 0.5f;
-    float width = 0.7f;
-    
-    std::vector<float> delayLine(input.size());
-    for (size_t i = 0; i < input.size(); ++i) {
-        size_t delay = static_cast<size_t>(roomSize * input.size());
-        if (i >= delay) {
-            delayLine[i] = input[i - delay] * damping;
-        }
-        
-        float pan = std::sin(2.0f * M_PI * static_cast<float>(i) / input.size());
-        output[i] = input[i] + delayLine[i] * (0.5f + pan * width);
-    }
-}
+    inputParameters.device = (inputDevice >= 0) ? inputDevice : Pa_GetDefaultInputDevice();
+    inputParameters.channelCount = 2;
+    inputParameters.sampleFormat = paFloat32;
+    inputParameters.suggestedLatency = Pa_GetDeviceInfo(inputParameters.device)->defaultLowInputLatency;
+    inputParameters.hostApiSpecificStreamInfo = nullptr;
 
-void AudioEngine::AdvancedProcessing::applyTemporalProcessing(
-    const std::vector<float>& input, std::vector<float>& output) {
-    
-    // Revolutionäre zeitliche Verarbeitung
-    float timeScale = 1.2f;
-    float pitchScale = 1.0f;
-    
-    for (size_t i = 0; i < output.size(); ++i) {
-        float pos = static_cast<float>(i) * timeScale;
-        size_t index = static_cast<size_t>(pos);
-        float frac = pos - index;
-        
-        if (index + 1 < input.size()) {
-            output[i] = input[index] * (1.0f - frac) + input[index + 1] * frac;
-        }
-    }
-    
-    // Pitch-Korrektur
-    if (pitchScale != 1.0f) {
-        std::vector<float> temp = output;
-        for (size_t i = 0; i < output.size(); ++i) {
-            float pos = static_cast<float>(i) / pitchScale;
-            size_t index = static_cast<size_t>(pos);
-            float frac = pos - index;
-            
-            if (index + 1 < temp.size()) {
-                output[i] = temp[index] * (1.0f - frac) + temp[index + 1] * frac;
-            }
-=======
-        spdlog::error("PortAudio initialization failed: {}", Pa_GetErrorText(err));
-        return false;
-    }
-    
-    return true;
-}
+    outputParameters.device = (outputDevice >= 0) ? outputDevice : Pa_GetDefaultOutputDevice();
+    outputParameters.channelCount = 2;
+    outputParameters.sampleFormat = paFloat32;
+    outputParameters.suggestedLatency = Pa_GetDeviceInfo(outputParameters.device)->defaultLowOutputLatency;
+    outputParameters.hostApiSpecificStreamInfo = nullptr;
 
-bool AudioEngine::initializeJUCE() {
-    juce::ScopedJuceInitialiser_GUI juceInit;
-    
-    juce::AudioFormatManager formatManager;
-    formatManager.registerBasicFormats();
-    
-    return true;
-}
+    err = Pa_OpenStream(&paStream,
+                       &inputParameters,
+                       &outputParameters,
+                       sampleRate,
+                       bufferSize,
+                       paClipOff,
+                       paCallback,
+                       this);
 
-std::vector<AudioEngine::AudioDevice> AudioEngine::getAvailableDevices() {
-    std::vector<AudioDevice> devices;
-    int numDevices = Pa_GetDeviceCount();
-    
-    for (int i = 0; i < numDevices; ++i) {
-        const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(i);
-        if (deviceInfo) {
-            AudioDevice device;
-            device.id = std::to_string(i);
-            device.name = deviceInfo->name;
-            device.type = (deviceInfo->maxInputChannels > 0) ? "Input" : "Output";
-            device.numInputChannels = deviceInfo->maxInputChannels;
-            device.numOutputChannels = deviceInfo->maxOutputChannels;
-            device.sampleRate = deviceInfo->defaultSampleRate;
-            device.bufferSize = 1024; // Default
-            
-            devices.push_back(device);
-        }
+    if (err != paNoError) {
+        throw std::runtime_error("Fehler beim Öffnen des PortAudio-Streams: " + std::string(Pa_GetErrorText(err)));
     }
-    
-    return devices;
-}
-
-bool AudioEngine::setInputDevice(const std::string& deviceId) {
-    // TODO: Implementiere Input-Device-Wechsel
-    return true;
-}
-
-bool AudioEngine::setOutputDevice(const std::string& deviceId) {
-    // TODO: Implementiere Output-Device-Wechsel
-    return true;
-}
-
-std::string AudioEngine::createTrack(const std::string& name) {
-    std::lock_guard<std::mutex> lock(pImpl->audioMutex);
-    
-    AudioTrack track;
-    track.id = "track_" + std::to_string(pImpl->tracks.size());
-    track.name = name;
-    track.volume = 1.0;
-    track.pan = 0.0;
-    track.muted = false;
-    track.solo = false;
-    
-    pImpl->tracks[track.id] = track;
-    return track.id;
 }
 
-bool AudioEngine::loadAudioFile(const std::string& trackId, const std::string& filePath) {
-    std::lock_guard<std::mutex> lock(pImpl->audioMutex);
-    
-    auto it = pImpl->tracks.find(trackId);
-    if (it == pImpl->tracks.end()) {
-        return false;
+void AudioEngine::initializeJACK() {
+    jackClient = jack_client_open("VRMusicStudio", JackNoStartServer, nullptr);
+    if (!jackClient) {
+        throw std::runtime_error("Fehler beim Öffnen des JACK-Clients");
     }
-    
-    juce::File file(filePath);
-    if (!file.existsAsFile()) {
-        return false;
-    }
-    
-    juce::AudioFormatManager formatManager;
-    formatManager.registerBasicFormats();
-    
-    std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(file));
-    if (!reader) {
-        return false;
-    }
-    
-    it->second.reader = reader.release();
-    it->second.buffer.setSize(reader->numChannels, reader->lengthInSamples);
-    reader->read(&it->second.buffer, 0, reader->lengthInSamples, 0, true, true);
-    
-    return true;
-}
 
-bool AudioEngine::play() {
-    std::lock_guard<std::mutex> lock(pImpl->audioMutex);
-    if (pImpl->isPlaying) {
-        return false;
-    }
-    
-    pImpl->isPlaying = true;
-    pImpl->isPaused = false;
-    pImpl->audioCV.notify_one();
-    return true;
-}
+    jack_set_process_callback(jackClient, jackCallback, this);
 
-bool AudioEngine::pause() {
-    std::lock_guard<std::mutex> lock(pImpl->audioMutex);
-    if (!pImpl->isPlaying || pImpl->isPaused) {
-        return false;
-    }
-    
-    pImpl->isPaused = true;
-    return true;
-}
+    jackInputPort = jack_port_register(jackClient, "input", JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
+    jackOutputPort = jack_port_register(jackClient, "output", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
 
-bool AudioEngine::stop() {
-    std::lock_guard<std::mutex> lock(pImpl->audioMutex);
-    if (!pImpl->isPlaying) {
-        return false;
+    if (!jackInputPort || !jackOutputPort) {
+        throw std::runtime_error("Fehler bei der JACK-Port-Registrierung");
     }
-    
-    pImpl->isPlaying = false;
-    pImpl->isPaused = false;
-    pImpl->currentPosition = 0.0;
-    return true;
-}
-
-void AudioEngine::processAudio(const juce::AudioBuffer<float>& input, juce::AudioBuffer<float>& output) {
-    output.clear();
-    
-    mixTracks(output);
-    
-    applyEffects(output);
-    
-    updateEffects();
-}
 
-void AudioEngine::mixTracks(juce::AudioBuffer<float>& output) {
-    for (const auto& [id, track] : pImpl->tracks) {
-        if (track.muted || (!track.solo && std::any_of(pImpl->tracks.begin(), pImpl->tracks.end(),
-            [](const auto& t) { return t.second.solo; }))) {
-            continue;
-        }
-        
-        for (int channel = 0; channel < output.getNumChannels(); ++channel) {
-            output.addFrom(channel, 0, track.buffer, channel, 0, output.getNumSamples(), track.volume);
->>>>>>> 0dff1c4 (init 2)
-        }
+    if (jack_activate(jackClient) != 0) {
+        throw std::runtime_error("Fehler bei der JACK-Client-Aktivierung");
     }
 }
 
-<<<<<<< HEAD
-// Revolutionäre Plugin-Funktionen
-void AudioEngine::AdvancedProcessing::loadCustomPlugin(const std::string& pluginPath) {
-    // Implementierung der revolutionären Plugin-Ladefunktion
-    // TODO: Implementiere die Plugin-Ladefunktion
-}
-
-void AudioEngine::AdvancedProcessing::configurePluginChain(const std::string& chainConfig) {
-    // Implementierung der revolutionären Plugin-Kettenkonfiguration
-    // TODO: Implementiere die Plugin-Kettenkonfiguration
-}
-
-void AudioEngine::AdvancedProcessing::applyPluginPreset(const std::string& presetName) {
-    // Implementierung der revolutionären Plugin-Preset-Anwendung
-    // TODO: Implementiere die Plugin-Preset-Anwendung
-}
-
-void AudioEngine::AdvancedProcessing::savePluginState(const std::string& stateName) {
-    // Implementierung der revolutionären Plugin-Zustandsspeicherung
-    // TODO: Implementiere die Plugin-Zustandsspeicherung
-}
-
-} // namespace VR_DAW 
-=======
-void AudioEngine::applyEffects(juce::AudioBuffer<float>& buffer) {
-    for (const auto& [id, effect] : pImpl->effects) {
-        if (effect.processor) {
-            juce::MidiBuffer midiBuffer;
-            effect.processor->processBlock(buffer, midiBuffer);
-        }
+void AudioEngine::shutdownPortAudio() {
+    if (paStream) {
+        Pa_CloseStream(paStream);
+        paStream = nullptr;
     }
+    Pa_Terminate();
 }
 
-void AudioEngine::updateEffects() {
-    for (auto& [id, effect] : pImpl->effects) {
-        if (effect.processor) {
-            effect.processor->prepareToPlay(pImpl->sampleRate, pImpl->bufferSize);
-        }
+void AudioEngine::shutdownJACK() {
+    if (jackClient) {
+        jack_client_close(jackClient);
+        jackClient = nullptr;
+        jackInputPort = nullptr;
+        jackOutputPort = nullptr;
     }
-}
-
-void AudioEngine::setProcessCallback(std::function<void(const juce::AudioBuffer<float>&)> callback) {
-    std::lock_guard<std::mutex> lock(pImpl->audioMutex);
-    pImpl->processCallback = callback;
-}
-
-void AudioEngine::setMIDICallback(std::function<void(const juce::MidiMessage&)> callback) {
-    std::lock_guard<std::mutex> lock(pImpl->audioMutex);
-    pImpl->midiCallback = callback;
-}
-
-void AudioEngine::setErrorCallback(std::function<void(const std::string&)> callback) {
-    std::lock_guard<std::mutex> lock(pImpl->audioMutex);
-    pImpl->errorCallback = callback;
 }
 
-} // namespace VRMusicStudio 
->>>>>>> 0dff1c4 (init 2)
+} // namespace Audio
+} // namespace VRMusicStudio

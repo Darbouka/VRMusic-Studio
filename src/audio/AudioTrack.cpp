@@ -5,7 +5,7 @@
 #include <sstream>
 #include <iomanip>
 
-namespace VR_DAW {
+namespace VRMusicStudio {
 
 AudioTrack::AudioTrack(const std::string& name)
     : name(name)
@@ -251,4 +251,4 @@ float AudioTrack::getPan() const {
     return pan;
 }
 
-} // namespace VR_DAW 
+} // namespace VRMusicStudio 

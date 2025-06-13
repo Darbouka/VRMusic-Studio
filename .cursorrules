@@ -1,0 +1,92 @@
+{
+    "version": 1,
+    "project": {
+        "name": "VRMusicStudio",
+        "type": "cpp",
+        "root": ".",
+        "build": {
+            "type": "cmake",
+            "directory": "build",
+            "command": "cmake --build build",
+            "clean": "rm -rf build/*",
+            "configure": "cmake -B build -S ."
+        }
+    },
+    "rules": [
+        {
+            "name": "Core Components",
+            "pattern": "src/core/**/*.{hpp,cpp}",
+            "group": "core"
+        },
+        {
+            "name": "Audio Components",
+            "pattern": "src/audio/**/*.{hpp,cpp}",
+            "group": "audio"
+        },
+        {
+            "name": "VR Components",
+            "pattern": "src/vr/**/*.{hpp,cpp}",
+            "group": "vr"
+        },
+        {
+            "name": "UI Components",
+            "pattern": "src/ui/**/*.{hpp,cpp}",
+            "group": "ui"
+        },
+        {
+            "name": "Tests",
+            "pattern": "tests/**/*.{hpp,cpp}",
+            "group": "tests"
+        },
+        {
+            "name": "Build Scripts",
+            "pattern": "scripts/**/*.{sh,cmake}",
+            "group": "scripts"
+        }
+    ],
+    "settings": {
+        "cpp": {
+            "standard": "c++17",
+            "compiler": "clang++",
+            "flags": [
+                "-Wall",
+                "-Wextra",
+                "-Wpedantic",
+                "-Werror",
+                "-std=c++17"
+            ],
+            "includePaths": [
+                "include",
+                "src",
+                "build/vcpkg_installed/x64-osx/include"
+            ]
+        },
+        "cmake": {
+            "generator": "Ninja",
+            "buildType": "Debug",
+            "options": {
+                "CMAKE_TOOLCHAIN_FILE": "vcpkg/scripts/buildsystems/vcpkg.cmake",
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
+        }
+    },
+    "tasks": {
+        "build": {
+            "command": "./scripts/build.sh",
+            "group": "build"
+        },
+        "install": {
+            "command": "./scripts/install_dependencies.sh",
+            "group": "build"
+        },
+        "test": {
+            "command": "cd build && ctest --output-on-failure",
+            "group": "test"
+        },
+        "clean": {
+            "command": "rm -rf build/*",
+            "group": "build"
+        }
+    }
+} 

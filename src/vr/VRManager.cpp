@@ -1,34 +1,27 @@
 #include "VRManager.hpp"
+#include "core/Logger.hpp"
 #include <stdexcept>
 #include <spdlog/spdlog.h>
 
-namespace VR_DAW {
+namespace VRMusicStudio {
+namespace VR {
 
-<<<<<<< HEAD
-std::unique_ptr<VRManager> VRManager::instance = nullptr;
-
-VRManager& VRManager::getInstance() {
-    if (!instance) {
-        instance = std::unique_ptr<VRManager>(new VRManager());
-    }
-    return *instance;
-=======
 VRManager& VRManager::getInstance() {
     static VRManager instance;
     return instance;
->>>>>>> 0dff1c4 (init 2)
 }
 
 VRManager::VRManager()
-    : vrSystem(nullptr)
-    , initialized(false)
-<<<<<<< HEAD
-    , running(false)
-    , listenerPosition(0.0f)
-    , listenerOrientation(1.0f, 0.0f, 0.0f, 0.0f)
-=======
->>>>>>> 0dff1c4 (init 2)
-    , logger("VRManager") {
+    : initialized(false)
+    , vrSystem(nullptr)
+    , trackingSpace(vr::TrackingUniverseStanding)
+    , renderWidth(0)
+    , renderHeight(0)
+    , ipd(0.0f) {
+    hmdPose = glm::mat4(1.0f);
+    for (auto& pose : controllerPoses) {
+        pose = glm::mat4(1.0f);
+    }
 }
 
 VRManager::~VRManager() {
@@ -37,331 +30,300 @@ VRManager::~VRManager() {
 
 bool VRManager::initialize() {
     std::lock_guard<std::mutex> lock(mutex);
-    
-    if (initialized) return true;
 
-    try {
-        if (!initializeOpenVR()) {
-            logger.error("Fehler bei der OpenVR-Initialisierung");
-            return false;
-        }
-
-        // HMD-Informationen abrufen
-        hmd = createDeviceInfo(vr::k_unTrackedDeviceIndex_Hmd);
-        
-        // Controller-Informationen abrufen
-        controllers.clear();
-        for (vr::TrackedDeviceIndex_t i = 0; i < vr::k_unMaxTrackedDeviceCount; ++i) {
-            if (vrSystem->GetTrackedDeviceClass(i) == vr::TrackedDeviceClass_Controller) {
-                controllers.push_back(createDeviceInfo(i));
-            }
-        }
-
-        // Audio-Engine initialisieren
-        if (!AudioEngine::getInstance().initialize()) {
-            spdlog::error("Konnte Audio-Engine nicht initialisieren");
-            return false;
-        }
-
-        initialized = true;
-<<<<<<< HEAD
-        running = true;
-=======
->>>>>>> 0dff1c4 (init 2)
-        logger.info("VR-Manager erfolgreich initialisiert");
+    if (initialized) {
         return true;
     }
-    catch (const std::exception& e) {
-        logger.error("Fehler bei der VR-Manager-Initialisierung: {}", e.what());
+
+    try {
+        auto& logger = Core::Logger::getInstance();
+        logger.info("Initialisiere VR-System...");
+
+        vr::EVRInitError error = vr::VRInitError_None;
+        vrSystem = vr::VR_Init(&error, vr::VRApplication_Scene);
+
+        if (error != vr::VRInitError_None) {
+            throw std::runtime_error("Fehler bei der VR-Initialisierung: " + std::string(vr::VR_GetVRInitErrorAsEnglishDescription(error)));
+        }
+
+        if (!vr::VRCompositor()) {
+            throw std::runtime_error("Fehler bei der VR-Compositor-Initialisierung");
+        }
+
+        // Setze Standardwerte
+        vrSystem->GetRecommendedRenderTargetSize(&renderWidth, &renderHeight);
+        ipd = vrSystem->GetFloatTrackedDeviceProperty(vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_UserIpdMeters_Float);
+
+        initialized = true;
+        logger.info("VR-System erfolgreich initialisiert");
+        return true;
+    } catch (const std::exception& e) {
+        spdlog::error("Fehler bei der VR-Initialisierung: {}", e.what());
         return false;
     }
 }
 
 void VRManager::shutdown() {
     std::lock_guard<std::mutex> lock(mutex);
-    
+
     if (!initialized) {
         return;
     }
 
     try {
-        shutdownOpenVR();
-        AudioEngine::getInstance().shutdown();
-        controllers.clear();
-        hmd = VRDevice();
+        auto& logger = Core::Logger::getInstance();
+        logger.info("Beende VR-System...");
+
+        if (vrSystem) {
+            vr::VR_Shutdown();
+            vrSystem = nullptr;
+        }
+
         initialized = false;
-<<<<<<< HEAD
-        running = false;
-=======
->>>>>>> 0dff1c4 (init 2)
-        logger.info("VR-Manager erfolgreich beendet");
-    }
-    catch (const std::exception& e) {
-        logger.error("Fehler beim Beenden des VR-Managers: {}", e.what());
+        logger.info("VR-System erfolgreich beendet");
+    } catch (const std::exception& e) {
+        spdlog::error("Fehler beim Beenden des VR-Systems: {}", e.what());
     }
 }
 
-bool VRManager::isInitialized() const {
-    std::lock_guard<std::mutex> lock(mutex);
-    return initialized;
-}
-
-<<<<<<< HEAD
 void VRManager::update() {
     std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!initialized || !running) return;
 
-    try {
-        processVREvents();
-
-        // HMD-Status aktualisieren
-        hmd = createDeviceInfo(vr::k_unTrackedDeviceIndex_Hmd);
-
-        // Controller-Status aktualisieren
-        for (auto& controller : controllers) {
-            controller = createDeviceInfo(controller.index);
-        }
-
-        // Audio-Positionen aktualisieren
-        updateAudioPositions();
-
-        // Audio-Engine aktualisieren
-        updateAudioEngine();
-
-        return true;
-    }
-    catch (const std::exception& e) {
-=======
-bool VRManager::update() {
-    std::lock_guard<std::mutex> lock(mutex);
-    if (!initialized) return false;
-    try {
-        processVREvents();
-        hmd = createDeviceInfo(vr::k_unTrackedDeviceIndex_Hmd);
-        for (auto& controller : controllers) {
-            controller = createDeviceInfo(controller.index);
-        }
-        return true;
-    } catch (const std::exception& e) {
->>>>>>> 0dff1c4 (init 2)
-        logger.error("Fehler beim VR-Update: {}", e.what());
-        return false;
-    }
-}
-
-void VRManager::resetSeatedPosition() {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!initialized) {
+    if (!initialized || !vrSystem) {
         return;
     }
 
     try {
-        vrSystem->ResetSeatedZeroPose();
-        logger.info("Sitzposition zurückgesetzt");
-    }
-    catch (const std::exception& e) {
-        logger.error("Fehler beim Zurücksetzen der Sitzposition: {}", e.what());
+        vr::VRCompositor()->WaitGetPoses(nullptr, 0, nullptr, 0);
+        updateDevicePoses();
+        updateHMDMatrixPose();
+        updateControllerPoses();
+    } catch (const std::exception& e) {
+        spdlog::error("Fehler im VR-Update: {}", e.what());
     }
 }
 
-std::vector<VRDevice> VRManager::getControllers() const {
+bool VRManager::isVRSystemActive() const {
     std::lock_guard<std::mutex> lock(mutex);
-    return controllers;
+    return initialized && vrSystem != nullptr;
 }
 
-bool VRManager::isControllerConnected(vr::TrackedDeviceIndex_t controllerIndex) const {
+bool VRManager::isHMDConnected() const {
     std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!initialized) {
+    return initialized && vrSystem && vrSystem->IsTrackedDeviceConnected(vr::k_unTrackedDeviceIndex_Hmd);
+}
+
+bool VRManager::isControllerConnected(vr::ETrackedControllerRole role) const {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (!initialized || !vrSystem) {
         return false;
     }
 
-    return vrSystem->IsTrackedDeviceConnected(controllerIndex);
-}
-
-glm::vec3 VRManager::getControllerPosition(vr::TrackedDeviceIndex_t controllerIndex) const {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!initialized) {
-        return glm::vec3(0.0f);
-    }
-
-    vr::TrackedDevicePose_t pose;
-    vrSystem->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.0f, &pose, 1);
-    
-    if (pose.bPoseIsValid) {
-        glm::mat4 matrix = convertSteamVRMatrixToMatrix4(pose.mDeviceToAbsoluteTracking);
-        return glm::vec3(matrix[3]);
-    }
-    
-    return glm::vec3(0.0f);
-}
-
-glm::quat VRManager::getControllerRotation(vr::TrackedDeviceIndex_t controllerIndex) const {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!initialized) {
-        return glm::quat();
-    }
-
-    vr::TrackedDevicePose_t pose;
-    vrSystem->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.0f, &pose, 1);
-    
-    if (pose.bPoseIsValid) {
-        glm::mat4 matrix = convertSteamVRMatrixToMatrix4(pose.mDeviceToAbsoluteTracking);
-        return glm::quat_cast(matrix);
-    }
-    
-    return glm::quat();
-}
-
-VRDevice VRManager::getHMD() const {
-    std::lock_guard<std::mutex> lock(mutex);
-    return hmd;
+    vr::TrackedDeviceIndex_t controllerId = vrSystem->GetTrackedDeviceIndexForControllerRole(role);
+    return controllerId != vr::k_unTrackedDeviceIndexInvalid;
 }
 
 glm::mat4 VRManager::getHMDPose() const {
     std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!initialized) {
+    return hmdPose;
+}
+
+glm::mat4 VRManager::getControllerPose(vr::ETrackedControllerRole role) const {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (!initialized || !vrSystem) {
         return glm::mat4(1.0f);
     }
 
-    vr::TrackedDevicePose_t pose;
-    vrSystem->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.0f, &pose, 1);
-    
-    if (pose.bPoseIsValid) {
-        return convertSteamVRMatrixToMatrix4(pose.mDeviceToAbsoluteTracking);
+    vr::TrackedDeviceIndex_t controllerId = vrSystem->GetTrackedDeviceIndexForControllerRole(role);
+    if (controllerId == vr::k_unTrackedDeviceIndexInvalid) {
+        return glm::mat4(1.0f);
     }
-    
-    return glm::mat4(1.0f);
+
+    return controllerPoses[controllerId];
+}
+
+glm::vec3 VRManager::getHMDPosition() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return glm::vec3(hmdPose[3]);
+}
+
+glm::quat VRManager::getHMDRotation() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return glm::quat_cast(glm::mat3(hmdPose));
+}
+
+std::vector<VRDeviceInfo> VRManager::getConnectedDevices() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return connectedDevices;
+}
+
+VRDeviceInfo VRManager::getDeviceInfo(vr::TrackedDeviceIndex_t deviceId) const {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (!initialized || !vrSystem || deviceId >= vr::k_unMaxTrackedDeviceCount) {
+        return VRDeviceInfo{};
+    }
+
+    for (const auto& device : connectedDevices) {
+        if (device.deviceId == deviceId) {
+            return device;
+        }
+    }
+
+    return VRDeviceInfo{};
+}
+
+void VRManager::setTrackingSpace(vr::ETrackingUniverseOrigin origin) {
+    std::lock_guard<std::mutex> lock(mutex);
+    trackingSpace = origin;
+}
+
+vr::ETrackingUniverseOrigin VRManager::getTrackingSpace() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return trackingSpace;
+}
+
+void VRManager::setRenderTargetSize(uint32_t width, uint32_t height) {
+    std::lock_guard<std::mutex> lock(mutex);
+    renderWidth = width;
+    renderHeight = height;
+}
+
+void VRManager::getRenderTargetSize(uint32_t& width, uint32_t& height) const {
+    std::lock_guard<std::mutex> lock(mutex);
+    width = renderWidth;
+    height = renderHeight;
+}
+
+void VRManager::setIPD(float newIpd) {
+    std::lock_guard<std::mutex> lock(mutex);
+    ipd = newIpd;
+}
+
+float VRManager::getIPD() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return ipd;
+}
+
+void VRManager::setProjectionMatrix(vr::Hmd_Eye eye, float near, float far) {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (!initialized || !vrSystem) {
+        return;
+    }
+
+    vr::HmdMatrix44_t projectionMatrix = vrSystem->GetProjectionMatrix(eye, near, far);
+    // Konvertiere die Matrix in glm::mat4
 }
 
 glm::mat4 VRManager::getProjectionMatrix(vr::Hmd_Eye eye) const {
     std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!initialized) {
+    if (!initialized || !vrSystem) {
         return glm::mat4(1.0f);
     }
 
-    vr::HmdMatrix44_t matrix = vrSystem->GetProjectionMatrix(eye, 0.1f, 1000.0f);
-    return convertSteamVRMatrixToMatrix4(matrix);
+    vr::HmdMatrix44_t projectionMatrix = vrSystem->GetProjectionMatrix(eye, 0.1f, 100.0f);
+    return glm::mat4(
+        projectionMatrix.m[0][0], projectionMatrix.m[1][0], projectionMatrix.m[2][0], projectionMatrix.m[3][0],
+        projectionMatrix.m[0][1], projectionMatrix.m[1][1], projectionMatrix.m[2][1], projectionMatrix.m[3][1],
+        projectionMatrix.m[0][2], projectionMatrix.m[1][2], projectionMatrix.m[2][2], projectionMatrix.m[3][2],
+        projectionMatrix.m[0][3], projectionMatrix.m[1][3], projectionMatrix.m[2][3], projectionMatrix.m[3][3]
+    );
 }
 
-glm::mat4 VRManager::getEyeToHeadTransform(vr::Hmd_Eye eye) const {
+glm::mat4 VRManager::getEyeViewMatrix(vr::Hmd_Eye eye) const {
     std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!initialized) {
+    if (!initialized || !vrSystem) {
         return glm::mat4(1.0f);
     }
 
-    vr::HmdMatrix34_t matrix = vrSystem->GetEyeToHeadTransform(eye);
-    return convertSteamVRMatrixToMatrix4(matrix);
+    vr::HmdMatrix34_t eyeMatrix = vrSystem->GetEyeToHeadTransform(eye);
+    return glm::mat4(
+        eyeMatrix.m[0][0], eyeMatrix.m[1][0], eyeMatrix.m[2][0], 0.0f,
+        eyeMatrix.m[0][1], eyeMatrix.m[1][1], eyeMatrix.m[2][1], 0.0f,
+        eyeMatrix.m[0][2], eyeMatrix.m[1][2], eyeMatrix.m[2][2], 0.0f,
+        eyeMatrix.m[0][3], eyeMatrix.m[1][3], eyeMatrix.m[2][3], 1.0f
+    );
 }
 
-void VRManager::processVREvents() {
-    vr::VREvent_t event;
-    while (pollNextEvent(event)) {
-        // Hier können VR-Events verarbeitet werden
-        // z.B. Controller-Input, Tracking-Status, etc.
+void VRManager::updateDevicePoses() {
+    if (!initialized || !vrSystem) {
+        return;
+    }
+
+    vr::TrackedDevicePose_t poses[vr::k_unMaxTrackedDeviceCount];
+    vr::VRCompositor()->GetLastPoses(poses, vr::k_unMaxTrackedDeviceCount, nullptr, 0);
+
+    connectedDevices.clear();
+    for (vr::TrackedDeviceIndex_t deviceId = 0; deviceId < vr::k_unMaxTrackedDeviceCount; deviceId++) {
+        if (!poses[deviceId].bDeviceIsConnected) {
+            continue;
+        }
+
+        VRDeviceInfo deviceInfo;
+        deviceInfo.deviceId = deviceId;
+        deviceInfo.deviceClass = vrSystem->GetTrackedDeviceClass(deviceId);
+        deviceInfo.isConnected = true;
+
+        char deviceName[vr::k_unMaxPropertyStringSize];
+        vrSystem->GetStringTrackedDeviceProperty(deviceId, vr::Prop_TrackingSystemName_String, deviceName, vr::k_unMaxPropertyStringSize);
+        deviceInfo.deviceName = deviceName;
+
+        if (poses[deviceId].bPoseIsValid) {
+            const vr::HmdMatrix34_t& matrix = poses[deviceId].mDeviceToAbsoluteTracking;
+            deviceInfo.position = glm::vec3(matrix.m[0][3], matrix.m[1][3], matrix.m[2][3]);
+            deviceInfo.rotation = glm::quat_cast(glm::mat3(
+                matrix.m[0][0], matrix.m[1][0], matrix.m[2][0],
+                matrix.m[0][1], matrix.m[1][1], matrix.m[2][1],
+                matrix.m[0][2], matrix.m[1][2], matrix.m[2][2]
+            ));
+        }
+
+        connectedDevices.push_back(deviceInfo);
     }
 }
 
-bool VRManager::pollNextEvent(vr::VREvent_t& event) {
-    if (!initialized) {
-        return false;
+void VRManager::updateHMDMatrixPose() {
+    if (!initialized || !vrSystem) {
+        return;
     }
-    return vrSystem->PollNextEvent(&event, sizeof(event));
-}
 
-bool VRManager::initializeOpenVR() {
-    vr::EVRInitError error = vr::VRInitError_None;
-    vrSystem = vr::VR_Init(&error, vr::VRApplication_Scene);
-    
-    if (error != vr::VRInitError_None) {
-        logger.error("OpenVR-Initialisierungsfehler: {}", vr::VR_GetVRInitErrorAsEnglishDescription(error));
-        return false;
-    }
-    
-    return true;
-}
+    vr::TrackedDevicePose_t hmdPose;
+    vr::VRCompositor()->GetLastPoses(&hmdPose, 1, nullptr, 0);
 
-void VRManager::shutdownOpenVR() {
-    if (vrSystem) {
-        vr::VR_Shutdown();
-        vrSystem = nullptr;
+    if (hmdPose.bPoseIsValid) {
+        const vr::HmdMatrix34_t& matrix = hmdPose.mDeviceToAbsoluteTracking;
+        this->hmdPose = glm::mat4(
+            matrix.m[0][0], matrix.m[1][0], matrix.m[2][0], 0.0f,
+            matrix.m[0][1], matrix.m[1][1], matrix.m[2][1], 0.0f,
+            matrix.m[0][2], matrix.m[1][2], matrix.m[2][2], 0.0f,
+            matrix.m[0][3], matrix.m[1][3], matrix.m[2][3], 1.0f
+        );
     }
 }
 
-VRDevice VRManager::createDeviceInfo(vr::TrackedDeviceIndex_t deviceIndex) {
-    VRDevice device;
-    device.index = deviceIndex;
-    device.isConnected = vrSystem->IsTrackedDeviceConnected(deviceIndex);
-    
-    if (device.isConnected) {
-        char buffer[vr::k_unMaxPropertyStringSize];
-        vrSystem->GetStringTrackedDeviceProperty(deviceIndex, vr::Prop_TrackingSystemName_String, buffer, sizeof(buffer));
-        device.name = buffer;
-        
-        vr::TrackedDevicePose_t pose;
-        vrSystem->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.0f, &pose, 1);
-        
-        device.isTracking = pose.bPoseIsValid;
-        if (device.isTracking) {
-            glm::mat4 matrix = convertSteamVRMatrixToMatrix4(pose.mDeviceToAbsoluteTracking);
-            device.position = glm::vec3(matrix[3]);
-            device.rotation = glm::quat_cast(matrix);
+void VRManager::updateControllerPoses() {
+    if (!initialized || !vrSystem) {
+        return;
+    }
+
+    for (vr::TrackedDeviceIndex_t deviceId = 0; deviceId < vr::k_unMaxTrackedDeviceCount; deviceId++) {
+        if (vrSystem->GetTrackedDeviceClass(deviceId) != vr::TrackedDeviceClass_Controller) {
+            continue;
+        }
+
+        vr::TrackedDevicePose_t controllerPose;
+        vr::VRCompositor()->GetLastPoses(&controllerPose, 1, nullptr, 0);
+
+        if (controllerPose.bPoseIsValid) {
+            const vr::HmdMatrix34_t& matrix = controllerPose.mDeviceToAbsoluteTracking;
+            controllerPoses[deviceId] = glm::mat4(
+                matrix.m[0][0], matrix.m[1][0], matrix.m[2][0], 0.0f,
+                matrix.m[0][1], matrix.m[1][1], matrix.m[2][1], 0.0f,
+                matrix.m[0][2], matrix.m[1][2], matrix.m[2][2], 0.0f,
+                matrix.m[0][3], matrix.m[1][3], matrix.m[2][3], 1.0f
+            );
         }
     }
-    
-    return device;
 }
 
-glm::mat4 VRManager::convertSteamVRMatrixToMatrix4(const vr::HmdMatrix34_t& matPose) {
-    glm::mat4 matrix(
-        matPose.m[0][0], matPose.m[1][0], matPose.m[2][0], 0.0f,
-        matPose.m[0][1], matPose.m[1][1], matPose.m[2][1], 0.0f,
-        matPose.m[0][2], matPose.m[1][2], matPose.m[2][2], 0.0f,
-        matPose.m[0][3], matPose.m[1][3], matPose.m[2][3], 1.0f
-    );
-    return matrix;
-}
-
-glm::mat4 VRManager::convertSteamVRMatrixToMatrix4(const vr::HmdMatrix44_t& mat) {
-    glm::mat4 matrix(
-        mat.m[0][0], mat.m[1][0], mat.m[2][0], mat.m[3][0],
-        mat.m[0][1], mat.m[1][1], mat.m[2][1], mat.m[3][1],
-        mat.m[0][2], mat.m[1][2], mat.m[2][2], mat.m[3][2],
-        mat.m[0][3], mat.m[1][3], mat.m[2][3], mat.m[3][3]
-    );
-    return matrix;
-}
-
-<<<<<<< HEAD
-void VRManager::updateAudioPositions() {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    // Listener-Position aktualisieren
-    AudioEngine::getInstance().setListenerPosition(listenerPosition);
-    AudioEngine::getInstance().setListenerOrientation(listenerOrientation);
-
-    // Audio-Quellen-Positionen aktualisieren
-    for (const auto& [sourceId, position] : audioSourcePositions) {
-        AudioEngine::getInstance().setSourcePosition(sourceId, position);
-    }
-
-    for (const auto& [sourceId, orientation] : audioSourceOrientations) {
-        AudioEngine::getInstance().setSourceOrientation(sourceId, orientation);
-    }
-}
-
-void VRManager::updateAudioEngine() {
-    // Hier können zusätzliche Audio-Engine-Updates durchgeführt werden
-    // z.B. Plugin-Updates, Effekt-Verarbeitung, etc.
-}
-
-=======
->>>>>>> 0dff1c4 (init 2)
-} // namespace VR_DAW 
+} // namespace VR
+} // namespace VRMusicStudio 

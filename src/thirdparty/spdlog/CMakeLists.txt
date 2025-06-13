@@ -195,36 +195,6 @@ target_include_directories(spdlog_header_only INTERFACE "$<BUILD_INTERFACE:${CMA
 target_link_libraries(spdlog_header_only INTERFACE Threads::Threads)
 
 # ---------------------------------------------------------------------------------------
-# Use fmt package if using external fmt
-# ---------------------------------------------------------------------------------------
-if(SPDLOG_FMT_EXTERNAL OR SPDLOG_FMT_EXTERNAL_HO)
-    if(NOT TARGET fmt::fmt)
-        find_package(fmt CONFIG REQUIRED)
-    endif()
-    target_compile_definitions(spdlog PUBLIC SPDLOG_FMT_EXTERNAL)
-    target_compile_definitions(spdlog_header_only INTERFACE SPDLOG_FMT_EXTERNAL)
-
-    # use external fmt-header-nly
-    if(SPDLOG_FMT_EXTERNAL_HO)
-        target_link_libraries(spdlog PUBLIC fmt::fmt-header-only)
-        target_link_libraries(spdlog_header_only INTERFACE fmt::fmt-header-only)
-    else() # use external compile fmt
-        target_link_libraries(spdlog PUBLIC fmt::fmt)
-        target_link_libraries(spdlog_header_only INTERFACE fmt::fmt)
-    endif()
-
-    set(PKG_CONFIG_REQUIRES fmt) # add dependency to pkg-config
-endif()
-
-# ---------------------------------------------------------------------------------------
-# Add required libraries for Android CMake build
-# ---------------------------------------------------------------------------------------
-if(ANDROID)
-    target_link_libraries(spdlog PUBLIC log)
-    target_link_libraries(spdlog_header_only INTERFACE log)
-endif()
-
-# ---------------------------------------------------------------------------------------
 # Misc definitions according to tweak options
 # ---------------------------------------------------------------------------------------
 set(SPDLOG_WCHAR_TO_UTF8_SUPPORT ${SPDLOG_WCHAR_SUPPORT})

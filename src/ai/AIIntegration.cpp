@@ -6,7 +6,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 
-namespace VR_DAW {
+namespace VRMusicStudio {
 
 AIIntegration& AIIntegration::getInstance() {
     static AIIntegration instance;
@@ -592,4 +592,4 @@ void AIIntegration::updateEmotions() {
     // Callbacks auslösen
 }
 
-} // namespace VR_DAW 
+} // namespace VRMusicStudio 

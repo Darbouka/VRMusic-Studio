@@ -1,82 +1,83 @@
 #include "Logger.hpp"
+#include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <filesystem>
+#include <mutex>
 
-namespace VR_DAW {
+namespace VRMusicStudio {
+namespace Core {
 
-Logger::Logger(const std::string& name)
-    : name(name)
-    , consoleOutput(true)
-    , fileOutput(false) {
-    initializeLogger();
+namespace {
+    constexpr const char* LOG_DIR = "logs";
+    constexpr const char* LOG_FILE = "vrmusicstudio.log";
+    constexpr size_t MAX_FILE_SIZE = 5 * 1024 * 1024;  // 5MB
+    constexpr size_t MAX_FILES = 3;
+}
+
+Logger& Logger::getInstance() {
+    static Logger instance;
+    return instance;
+}
+
+Logger::Logger() {
+    try {
+        // Erstelle Logs-Verzeichnis
+        std::filesystem::create_directories(LOG_DIR);
+
+        // Konfiguriere Logger
+        auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+        console_sink->set_level(spdlog::level::debug);
+        console_sink->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] [%t] %v");
+
+        auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
+            std::string(LOG_DIR) + "/" + LOG_FILE,
+            MAX_FILE_SIZE,
+            MAX_FILES
+        );
+        file_sink->set_level(spdlog::level::debug);
+        file_sink->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] [%t] %v");
+
+        std::vector<spdlog::sink_ptr> sinks {console_sink, file_sink};
+        logger_ = std::make_shared<spdlog::logger>("VRMusicStudio", sinks.begin(), sinks.end());
+        logger_->set_level(spdlog::level::debug);
+        logger_->flush_on(spdlog::level::debug);
+
+        spdlog::register_logger(logger_);
+        spdlog::set_default_logger(logger_);
+    } catch (const std::exception& e) {
+        // Fallback auf Konsolen-Logger
+        logger_ = spdlog::stdout_color_mt("VRMusicStudio");
+        logger_->set_level(spdlog::level::debug);
+        logger_->error("Fehler bei der Logger-Initialisierung: {}", e.what());
+    }
 }
 
 Logger::~Logger() {
-    spdlog::drop(name);
+    spdlog::shutdown();
 }
 
-void Logger::initializeLogger() {
-    std::vector<spdlog::sink_ptr> sinks;
-
-    if (consoleOutput) {
-        auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-        console_sink->set_level(spdlog::level::debug);
-        sinks.push_back(console_sink);
-    }
-
-    if (fileOutput && !logFilePath.empty()) {
-        try {
-            auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-                logFilePath,
-                1024 * 1024 * 5,  // 5MB
-                3                 // 3 Dateien
-            );
-            file_sink->set_level(spdlog::level::debug);
-            sinks.push_back(file_sink);
-        }
-        catch (const spdlog::spdlog_ex& ex) {
-            // Fehler beim Erstellen der Datei-Sink
-            consoleOutput = true;
-            auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-            console_sink->set_level(spdlog::level::debug);
-            sinks.push_back(console_sink);
-        }
-    }
-
-    logger = std::make_shared<spdlog::logger>(name, sinks.begin(), sinks.end());
-    logger->set_level(spdlog::level::debug);
-    logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] [%n] %v");
-    spdlog::register_logger(logger);
+void Logger::setLogLevel(LogLevel level) {
+    logger_->set_level(static_cast<spdlog::level::level_enum>(level));
 }
 
-void Logger::setLogLevel(spdlog::level::level_enum level) {
-    std::lock_guard<std::mutex> lock(mutex);
-    logger->set_level(level);
+LogLevel Logger::getLogLevel() const {
+    return static_cast<LogLevel>(logger_->level());
 }
 
-void Logger::setLogFile(const std::string& filePath) {
-    std::lock_guard<std::mutex> lock(mutex);
-    logFilePath = filePath;
-    fileOutput = true;
-    updateLogger();
+void Logger::flush() {
+    logger_->flush();
 }
 
-void Logger::setConsoleOutput(bool enable) {
-    std::lock_guard<std::mutex> lock(mutex);
-    consoleOutput = enable;
-    updateLogger();
+void Logger::info(const std::string& msg) {
+    if (logger_) logger_->info(msg);
+    else spdlog::info(msg);
 }
 
-void Logger::setFileOutput(bool enable) {
-    std::lock_guard<std::mutex> lock(mutex);
-    fileOutput = enable;
-    updateLogger();
+void Logger::error(const std::string& msg) {
+    if (logger_) logger_->error(msg);
+    else spdlog::error(msg);
 }
 
-void Logger::updateLogger() {
-    spdlog::drop(name);
-    initializeLogger();
-}
-
-} // namespace VR_DAW 
+} // namespace Core
+} // namespace VRMusicStudio 

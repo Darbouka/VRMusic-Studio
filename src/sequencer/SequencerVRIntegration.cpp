@@ -3,10 +3,11 @@
 #include <algorithm>
 #include <cmath>
 
-namespace VR_DAW {
+namespace VRMusicStudio {
 
 SequencerVRIntegration::SequencerVRIntegration() {
-    initializeComponents();
+    vrEngine = std::make_unique<VREngine>();
+    kiIntegration = std::make_unique<SequencerKIIntegration>();
 }
 
 SequencerVRIntegration::~SequencerVRIntegration() {
@@ -14,347 +15,105 @@ SequencerVRIntegration::~SequencerVRIntegration() {
 }
 
 void SequencerVRIntegration::initialize() {
-    try {
-        initializeComponents();
-        updateState();
-        validateState();
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
+    vrEngine->initialize();
+    kiIntegration->connectKI();
 }
 
 void SequencerVRIntegration::update() {
-    try {
-        updateState();
-        processVRToSequencer();
-        processSequencerToVR();
-        updateParameters();
-        generateVisualization();
-        applyAutomationCurves();
-        optimizeSequence();
-        validateState();
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void SequencerVRIntegration::shutdown() {
-    try {
-        vrEngine.reset();
-        kiIntegration.reset();
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void SequencerVRIntegration::processVR(const std::string& vrName, const std::vector<float>& inputBuffer, std::vector<float>& outputBuffer) {
-    try {
-        if (!validateVRBuffer(inputBuffer)) {
-            throw std::runtime_error("Invalid VR buffer");
-        }
-
-        float level = calculateVRLevel(inputBuffer);
-        float spectrum = calculateVRSpectrum(inputBuffer);
-        float phase = calculateVRPhase(inputBuffer);
-
-        // Verarbeite VR-Daten
-        vrEngine->process(inputBuffer, outputBuffer, level, spectrum, phase);
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void SequencerVRIntegration::processPatternVR(const std::string& patternName, const std::string& vrName, const std::vector<float>& inputBuffer, std::vector<float>& outputBuffer) {
-    try {
-        if (!validateVRBuffer(inputBuffer)) {
-            throw std::runtime_error("Invalid pattern VR buffer");
-        }
-
-        float level = calculateVRLevel(inputBuffer);
-        float spectrum = calculateVRSpectrum(inputBuffer);
-        float phase = calculateVRPhase(inputBuffer);
-
-        // Verarbeite Pattern-VR-Daten
-        vrEngine->processPattern(patternName, vrName, inputBuffer, outputBuffer, level, spectrum, phase);
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void SequencerVRIntegration::processAutomationVR(const std::string& patternName, const std::string& vrName, const std::vector<float>& inputBuffer, std::vector<float>& outputBuffer) {
-    try {
-        if (!validateVRBuffer(inputBuffer)) {
-            throw std::runtime_error("Invalid automation VR buffer");
-        }
-
-        float level = calculateVRLevel(inputBuffer);
-        float spectrum = calculateVRSpectrum(inputBuffer);
-        float phase = calculateVRPhase(inputBuffer);
-
-        // Verarbeite Automation-VR-Daten
-        vrEngine->processAutomation(patternName, vrName, inputBuffer, outputBuffer, level, spectrum, phase);
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void SequencerVRIntegration::createPattern(const std::string& name) {
-    try {
-        vrEngine->createPattern(name);
-        currentState.activePatterns.push_back(name);
-        currentState.patternAutomation[name] = false;
-        currentState.patternVRs[name] = std::vector<std::string>();
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void SequencerVRIntegration::editPattern(const std::string& name) {
-    try {
-        vrEngine->editPattern(name);
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void SequencerVRIntegration::deletePattern(const std::string& name) {
-    try {
-        vrEngine->deletePattern(name);
-        auto it = std::find(currentState.activePatterns.begin(), currentState.activePatterns.end(), name);
-        if (it != currentState.activePatterns.end()) {
-            currentState.activePatterns.erase(it);
-        }
-        currentState.patternAutomation.erase(name);
-        currentState.patternVRs.erase(name);
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void SequencerVRIntegration::savePattern(const std::string& name) {
-    try {
-        vrEngine->savePattern(name);
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void SequencerVRIntegration::loadPattern(const std::string& name) {
-    try {
-        vrEngine->loadPattern(name);
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void SequencerVRIntegration::playSequence() {
-    try {
-        currentState.isPlaying = true;
-        currentState.isPaused = false;
-        vrEngine->play();
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void SequencerVRIntegration::pauseSequence() {
-    try {
-        currentState.isPaused = true;
-        vrEngine->pause();
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void SequencerVRIntegration::stopSequence() {
-    try {
-        currentState.isPlaying = false;
-        currentState.isPaused = false;
-        vrEngine->stop();
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void SequencerVRIntegration::setTempo(float tempo) {
-    try {
-        currentState.currentTempo = tempo;
-        vrEngine->setTempo(tempo);
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void SequencerVRIntegration::setSwing(float swing) {
-    try {
-        currentState.currentSwing = swing;
-        vrEngine->setSwing(swing);
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void SequencerVRIntegration::connectKI() {
-    try {
-        kiIntegration->connect();
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void SequencerVRIntegration::updateKIFeedback() {
-    try {
-        kiIntegration->updateFeedback();
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void SequencerVRIntegration::applyKISuggestions() {
-    try {
-        kiIntegration->applySuggestions();
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void SequencerVRIntegration::updatePatternVisualization() {
-    try {
-        vrEngine->updatePatternVisualization();
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void SequencerVRIntegration::updateSequenceVisualization() {
-    try {
-        vrEngine->updateSequenceVisualization();
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void SequencerVRIntegration::updateAutomationVisualization() {
-    try {
-        vrEngine->updateAutomationVisualization();
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void SequencerVRIntegration::updateAnalysisVisualization() {
-    try {
-        vrEngine->updateAnalysisVisualization();
-    } catch (const std::exception& e) {
-        handleErrors();
-        throw;
-    }
-}
-
-void SequencerVRIntegration::initializeComponents() {
-    vrEngine = std::make_unique<VREngine>();
-    kiIntegration = std::make_unique<SequencerKIIntegration>();
-}
-
-void SequencerVRIntegration::updateState() {
-    currentState.isPlaying = vrEngine->isPlaying();
-    currentState.isPaused = vrEngine->isPaused();
-    currentState.currentTempo = vrEngine->getTempo();
-    currentState.currentSwing = vrEngine->getSwing();
-}
-
-void SequencerVRIntegration::processVRToSequencer() {
-    // Implementierung der VR-zu-Sequencer-Verarbeitung
-}
-
-void SequencerVRIntegration::processSequencerToVR() {
-    // Implementierung der Sequencer-zu-VR-Verarbeitung
-}
-
-void SequencerVRIntegration::updateParameters() {
-    // Implementierung der Parameter-Aktualisierung
-}
-
-void SequencerVRIntegration::updateAnalysis() {
-    // Implementierung der Analyse-Aktualisierung
-}
-
-void SequencerVRIntegration::generateVisualization() {
+    vrEngine->update();
+    kiIntegration->updateKIFeedback();
     updatePatternVisualization();
     updateSequenceVisualization();
     updateAutomationVisualization();
     updateAnalysisVisualization();
 }
 
-void SequencerVRIntegration::applyAutomationCurves() {
-    // Implementierung der Automation-Kurven-Anwendung
+void SequencerVRIntegration::shutdown() {
+    vrEngine->shutdown();
+    kiIntegration.reset();
 }
 
-void SequencerVRIntegration::optimizeSequence() {
-    // Implementierung der Sequenz-Optimierung
+void SequencerVRIntegration::processVR(const std::string& vrName, const std::vector<float>& inputBuffer, std::vector<float>& outputBuffer) {
+    // Dummy: In echter Implementierung würde hier die VR-Verarbeitung stattfinden
+    outputBuffer = inputBuffer;
 }
 
-void SequencerVRIntegration::validateState() {
-    if (!vrEngine || !kiIntegration) {
-        throw std::runtime_error("Components not initialized");
-    }
+void SequencerVRIntegration::processPatternVR(const std::string& patternName, const std::string& vrName, const std::vector<float>& inputBuffer, std::vector<float>& outputBuffer) {
+    // Dummy: In echter Implementierung würde hier die Pattern-VR-Verarbeitung stattfinden
+    outputBuffer = inputBuffer;
 }
 
-void SequencerVRIntegration::handleErrors() {
-    // Implementierung der Fehlerbehandlung
+void SequencerVRIntegration::processAutomationVR(const std::string& patternName, const std::string& vrName, const std::vector<float>& inputBuffer, std::vector<float>& outputBuffer) {
+    // Dummy: In echter Implementierung würde hier die Automation-VR-Verarbeitung stattfinden
+    outputBuffer = inputBuffer;
 }
 
-bool SequencerVRIntegration::validateVRBuffer(const std::vector<float>& buffer) {
-    return !buffer.empty() && std::all_of(buffer.begin(), buffer.end(), [](float x) { return std::isfinite(x); });
+void SequencerVRIntegration::createPattern(const std::string& name) {
+    // Dummy: In echter Implementierung würde hier ein neues Pattern erstellt
 }
 
-float SequencerVRIntegration::calculateVRLevel(const std::vector<float>& buffer) {
-    if (buffer.empty()) return 0.0f;
-    float sum = 0.0f;
-    for (float sample : buffer) {
-        sum += sample * sample;
-    }
-    return std::sqrt(sum / buffer.size());
+void SequencerVRIntegration::editPattern(const std::string& name) {
+    // Dummy: In echter Implementierung würde hier ein Pattern bearbeitet
 }
 
-float SequencerVRIntegration::calculateVRSpectrum(const std::vector<float>& buffer) {
-    if (buffer.empty()) return 0.0f;
-    float sum = 0.0f;
-    for (float sample : buffer) {
-        sum += std::abs(sample);
-    }
-    return sum / buffer.size();
+void SequencerVRIntegration::deletePattern(const std::string& name) {
+    // Dummy: In echter Implementierung würde hier ein Pattern gelöscht
 }
 
-float SequencerVRIntegration::calculateVRPhase(const std::vector<float>& buffer) {
-    if (buffer.empty()) return 0.0f;
-    float sum = 0.0f;
-    for (size_t i = 1; i < buffer.size(); ++i) {
-        sum += std::atan2(buffer[i], buffer[i-1]);
-    }
-    return sum / (buffer.size() - 1);
+void SequencerVRIntegration::savePattern(const std::string& name) {
+    // Dummy: In echter Implementierung würde hier ein Pattern gespeichert
 }
 
-} // namespace VR_DAW 
+void SequencerVRIntegration::loadPattern(const std::string& name) {
+    // Dummy: In echter Implementierung würde hier ein Pattern geladen
+}
+
+void SequencerVRIntegration::playSequence() {
+    // Dummy: In echter Implementierung würde hier die Sequenz gestartet
+}
+
+void SequencerVRIntegration::pauseSequence() {
+    // Dummy: In echter Implementierung würde hier die Sequenz pausiert
+}
+
+void SequencerVRIntegration::stopSequence() {
+    // Dummy: In echter Implementierung würde hier die Sequenz gestoppt
+}
+
+void SequencerVRIntegration::setTempo(float newTempo) {
+    // Dummy: In echter Implementierung würde hier das Tempo gesetzt
+}
+
+void SequencerVRIntegration::setSwing(float newSwing) {
+    // Dummy: In echter Implementierung würde hier der Swing gesetzt
+}
+
+void SequencerVRIntegration::connectKI() {
+    // Dummy: In echter Implementierung würde hier die KI verbunden
+}
+
+void SequencerVRIntegration::updateKIFeedback() {
+    // Dummy: In echter Implementierung würde hier das KI-Feedback aktualisiert
+}
+
+void SequencerVRIntegration::applyKISuggestions() {
+    // Dummy: In echter Implementierung würden hier KI-Vorschläge angewendet
+}
+
+void SequencerVRIntegration::updatePatternVisualization() {
+    // Dummy: In echter Implementierung würde hier die Pattern-Visualisierung aktualisiert
+}
+
+void SequencerVRIntegration::updateSequenceVisualization() {
+    // Dummy: In echter Implementierung würde hier die Sequenz-Visualisierung aktualisiert
+}
+
+void SequencerVRIntegration::updateAutomationVisualization() {
+    // Dummy: In echter Implementierung würde hier die Automation-Visualisierung aktualisiert
+}
+
+void SequencerVRIntegration::updateAnalysisVisualization() {
+    // Dummy: In echter Implementierung würde hier die Analyse-Visualisierung aktualisiert
+}
+
+} // namespace VRMusicStudio 

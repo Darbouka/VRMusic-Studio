@@ -1,58 +1,53 @@
-<<<<<<< HEAD
-add_library(VR-DAW-AI
+cmake_minimum_required(VERSION 3.15)
+
+# Find required packages
+find_package(spdlog REQUIRED)
+find_package(Threads REQUIRED)
+
+# AI-Bibliothek
+add_library(ai STATIC
+    AIEngine.cpp
     AIIntegration.cpp
 )
 
-target_include_directories(VR-DAW-AI
+target_include_directories(ai
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
     PRIVATE
-        ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/../..
 )
 
-target_link_libraries(VR-DAW-AI
+target_link_libraries(ai
     PUBLIC
-        VR-DAW-Core
-        VR-DAW-Audio
+        core
+        audio
     PRIVATE
+        spdlog::spdlog
         ${CMAKE_THREAD_LIBS_INIT}
 )
 
-target_compile_definitions(VR-DAW-AI
-    PRIVATE
-        VR_DAW_AI_EXPORTS
-=======
-# AI-Bibliothek
-add_library(VRMusicStudio::AI STATIC
-    AIEngine.cpp
+target_compile_definitions(ai PRIVATE
+    VR_DAW_AI_EXPORTS
 )
 
-target_include_directories(VRMusicStudio::AI
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/..
-)
+target_compile_features(ai PRIVATE cxx_std_17)
 
-target_link_libraries(VRMusicStudio::AI
-    PUBLIC
-        TensorFlow::TensorFlow
-        PyTorch::PyTorch
-    PRIVATE
-        spdlog::spdlog
-)
+if(MSVC)
+    target_compile_options(ai PRIVATE /W4)
+else()
+    target_compile_options(ai PRIVATE -Wall -Wextra -Wpedantic)
+endif()
 
 # Installationsregeln
-install(TARGETS VRMusicStudio::AI
+install(TARGETS ai
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
 )
 
 install(
     DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    DESTINATION include/VRMusicStudio/ai
+    DESTINATION include/vrmusicstudio/ai
     FILES_MATCHING PATTERN "*.hpp"
->>>>>>> 0dff1c4 (init 2)
 )
 
 # KI-Module

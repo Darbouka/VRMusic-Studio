@@ -55,4 +55,40 @@ USER vrmusic
 WORKDIR /home/vrmusic
 
 # Starte Anwendung
-CMD ["vrmusicstudio"] 
+CMD ["vrmusicstudio"]
+
+# System-Pakete installieren
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    ninja-build \
+    python3 \
+    python3-pip \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# vcpkg installieren
+RUN git clone https://github.com/Microsoft/vcpkg.git /opt/vcpkg \
+    && /opt/vcpkg/bootstrap-vcpkg.sh
+
+# Arbeitsverzeichnis erstellen
+WORKDIR /app
+
+# Projektdateien kopieren
+COPY . .
+
+# Abhängigkeiten installieren
+RUN /opt/vcpkg/vcpkg install \
+    spdlog:x64-linux \
+    fmt:x64-linux \
+    glew:x64-linux \
+    glfw3:x64-linux \
+    glm:x64-linux
+
+# Build-Verzeichnis erstellen und konfigurieren
+RUN mkdir build && cd build \
+    && cmake .. -DCMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+# Build-Befehl
+CMD ["cmake", "--build", "build"] 

@@ -1,9 +1,6 @@
 #include "PluginManager.hpp"
 #include "AudioPlugin.hpp"
 #include "Logger.hpp"
-<<<<<<< HEAD
-#include <filesystem>
-=======
 #if __has_include(<filesystem>)
     #include <filesystem>
     namespace fs = std::filesystem;
@@ -13,14 +10,26 @@
 #else
     #error "No filesystem support"
 #endif
->>>>>>> 0dff1c4 (init 2)
 #include <dlfcn.h>
 #include <sstream>
+#include <algorithm>
 
 namespace VR_DAW {
 
+namespace {
+    std::string generatePluginId(const std::string& pluginPath) {
+        return fs::path(pluginPath).filename().string();
+    }
+
+    bool validatePlugin(const std::string& pluginPath) {
+        return fs::exists(pluginPath) && 
+               fs::is_regular_file(pluginPath);
+    }
+}
+
 PluginManager::PluginManager()
-    : initialized(false) {
+    : initialized(false)
+    , logger_(Logger::getInstance()) {
 }
 
 PluginManager::~PluginManager() {
@@ -31,17 +40,17 @@ bool PluginManager::initialize() {
     std::lock_guard<std::mutex> lock(mutex);
     
     if (initialized) {
+        logger_.warn("Plugin-Manager bereits initialisiert");
         return true;
     }
 
     try {
         plugins.clear();
         initialized = true;
-        Logger("PluginManager").info("Plugin-Manager erfolgreich initialisiert");
+        logger_.info("Plugin-Manager erfolgreich initialisiert");
         return true;
-    }
-    catch (const std::exception& e) {
-        Logger("PluginManager").error("Fehler bei der Initialisierung des Plugin-Managers: {}", e.what());
+    } catch (const std::exception& e) {
+        logger_.error("Fehler bei der Initialisierung des Plugin-Managers: {}", e.what());
         return false;
     }
 }
@@ -56,10 +65,9 @@ void PluginManager::shutdown() {
     try {
         unloadAllPlugins();
         initialized = false;
-        Logger("PluginManager").info("Plugin-Manager erfolgreich beendet");
-    }
-    catch (const std::exception& e) {
-        Logger("PluginManager").error("Fehler beim Beenden des Plugin-Managers: {}", e.what());
+        logger_.info("Plugin-Manager erfolgreich heruntergefahren");
+    } catch (const std::exception& e) {
+        logger_.error("Fehler beim Herunterfahren des Plugin-Managers: {}", e.what());
     }
 }
 
@@ -70,129 +78,87 @@ bool PluginManager::loadPlugin(const std::string& pluginPath) {
         throw PluginException("Plugin-Manager nicht initialisiert");
     }
 
-    try {
-        if (!validatePlugin(pluginPath)) {
-            throw PluginLoadException("Ungültiges Plugin: " + pluginPath);
-        }
+    if (!validatePlugin(pluginPath)) {
+        throw PluginException("Ungültiger Plugin-Pfad: " + pluginPath);
+    }
 
-        if (!checkPluginCompatibility(pluginPath)) {
-            throw PluginLoadException("Inkompatibles Plugin: " + pluginPath);
-        }
-
-        std::string pluginId = generatePluginId(pluginPath);
-        if (isPluginLoaded(pluginId)) {
-            Logger("PluginManager").warn("Plugin bereits geladen: {}", pluginId);
-            return true;
-        }
-
-        void* handle = dlopen(pluginPath.c_str(), RTLD_LAZY);
-        if (!handle) {
-            throw PluginLoadException("Fehler beim Laden des Plugins: " + std::string(dlerror()));
-        }
-
-        using CreatePluginFunc = AudioPlugin* (*)();
-        auto createPlugin = reinterpret_cast<CreatePluginFunc>(dlsym(handle, "createPlugin"));
-        if (!createPlugin) {
-            dlclose(handle);
-            throw PluginLoadException("Fehler beim Laden der Plugin-Funktion: " + std::string(dlerror()));
-        }
-
-        auto plugin = std::shared_ptr<AudioPlugin>(createPlugin());
-        if (!plugin) {
-            dlclose(handle);
-            throw PluginInitException("Fehler beim Erstellen des Plugins");
-        }
-
-        if (!plugin->initialize()) {
-            dlclose(handle);
-            throw PluginInitException("Fehler bei der Initialisierung des Plugins");
-        }
-
-        PluginInfo info;
-        info.plugin = plugin;
-        info.handle = handle;
-        info.path = pluginPath;
-        info.isInitialized = true;
-
-        plugins[pluginId] = info;
-        Logger("PluginManager").info("Plugin erfolgreich geladen: {}", pluginId);
+    const std::string pluginId = generatePluginId(pluginPath);
+    
+    if (isPluginLoaded(pluginId)) {
+        logger_.warn("Plugin {} bereits geladen", pluginId);
         return true;
     }
-    catch (const PluginException& e) {
-        Logger("PluginManager").error("Plugin-Fehler: {}", e.what());
-        return false;
-    }
-    catch (const std::exception& e) {
-        Logger("PluginManager").error("Unerwarteter Fehler beim Laden des Plugins: {}", e.what());
+
+    try {
+        auto plugin = std::make_shared<AudioPlugin>();
+        if (!plugin->initialize()) {
+            throw PluginException("Plugin konnte nicht initialisiert werden: " + pluginId);
+        }
+
+        plugins[pluginId] = plugin;
+        logger_.info("Plugin {} erfolgreich geladen", pluginId);
+        return true;
+    } catch (const std::exception& e) {
+        logger_.error("Fehler beim Laden des Plugins {}: {}", pluginId, e.what());
         return false;
     }
 }
 
-void PluginManager::unloadPlugin(const std::string& pluginId) {
+void PluginManager::unloadPlugin(const std::string& pluginName) {
     std::lock_guard<std::mutex> lock(mutex);
     
     if (!initialized) {
         return;
     }
 
+    auto it = plugins.find(pluginName);
+    if (it == plugins.end()) {
+        logger_.warn("Plugin {} nicht gefunden", pluginName);
+        return;
+    }
+
     try {
-        auto it = plugins.find(pluginId);
-        if (it != plugins.end()) {
-            cleanupPlugin(it->second);
-            plugins.erase(it);
-            Logger("PluginManager").info("Plugin erfolgreich entladen: {}", pluginId);
-        }
+        it->second->shutdown();
+        plugins.erase(it);
+        logger_.info("Plugin {} erfolgreich entladen", pluginName);
+    } catch (const std::exception& e) {
+        logger_.error("Fehler beim Entladen des Plugins {}: {}", pluginName, e.what());
     }
-    catch (const std::exception& e) {
-        Logger("PluginManager").error("Fehler beim Entladen des Plugins '{}': {}", pluginId, e.what());
+}
+
+bool PluginManager::isPluginLoaded(const std::string& pluginName) const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return plugins.find(pluginName) != plugins.end();
+}
+
+AudioPluginPtr PluginManager::getPlugin(const std::string& pluginName) const {
+    std::lock_guard<std::mutex> lock(mutex);
+    
+    auto it = plugins.find(pluginName);
+    if (it == plugins.end()) {
+        throw PluginException("Plugin nicht gefunden: " + pluginName);
     }
+    
+    return it->second;
+}
+
+std::vector<std::string> PluginManager::getLoadedPluginNames() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    
+    std::vector<std::string> names;
+    names.reserve(plugins.size());
+    
+    for (const auto& [name, _] : plugins) {
+        names.push_back(name);
+    }
+    
+    return names;
 }
 
 void PluginManager::unloadAllPlugins() {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    if (!initialized) {
-        return;
+    for (const auto& [name, _] : plugins) {
+        unloadPlugin(name);
     }
-
-    try {
-        for (auto& [pluginId, info] : plugins) {
-            cleanupPlugin(info);
-        }
-        plugins.clear();
-        Logger("PluginManager").info("Alle Plugins erfolgreich entladen");
-    }
-    catch (const std::exception& e) {
-        Logger("PluginManager").error("Fehler beim Entladen aller Plugins: {}", e.what());
-    }
-}
-
-std::vector<std::string> PluginManager::getLoadedPlugins() const {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    std::vector<std::string> pluginIds;
-    pluginIds.reserve(plugins.size());
-    
-    for (const auto& [pluginId, _] : plugins) {
-        pluginIds.push_back(pluginId);
-    }
-    
-    return pluginIds;
-}
-
-std::shared_ptr<AudioPlugin> PluginManager::getPlugin(const std::string& pluginId) const {
-    std::lock_guard<std::mutex> lock(mutex);
-    
-    auto it = plugins.find(pluginId);
-    if (it != plugins.end()) {
-        return it->second.plugin;
-    }
-    return nullptr;
-}
-
-bool PluginManager::isPluginLoaded(const std::string& pluginId) const {
-    std::lock_guard<std::mutex> lock(mutex);
-    return plugins.find(pluginId) != plugins.end();
 }
 
 void PluginManager::update() {
@@ -202,91 +168,13 @@ void PluginManager::update() {
         return;
     }
 
-    try {
-        for (auto& [pluginId, info] : plugins) {
-            if (info.isInitialized && info.plugin) {
-                info.plugin->update();
-            }
-        }
-    }
-    catch (const std::exception& e) {
-        Logger("PluginManager").error("Fehler beim Aktualisieren der Plugins: {}", e.what());
-    }
-}
-
-bool PluginManager::validatePlugin(const std::string& pluginPath) const {
-    try {
-<<<<<<< HEAD
-        if (!std::filesystem::exists(pluginPath)) {
-            return false;
-        }
-
-        auto extension = std::filesystem::path(pluginPath).extension().string();
-=======
-        if (!fs::exists(pluginPath)) {
-            return false;
-        }
-
-        auto extension = fs::path(pluginPath).extension().string();
->>>>>>> 0dff1c4 (init 2)
-        if (extension != ".so" && extension != ".dylib" && extension != ".dll") {
-            return false;
-        }
-
-        return true;
-    }
-    catch (const std::exception& e) {
-        Logger("PluginManager").error("Fehler bei der Plugin-Validierung: {}", e.what());
-        return false;
-    }
-}
-
-std::string PluginManager::generatePluginId(const std::string& pluginPath) const {
-    try {
-<<<<<<< HEAD
-        return std::filesystem::path(pluginPath).stem().string();
-=======
-        return fs::path(pluginPath).stem().string();
->>>>>>> 0dff1c4 (init 2)
-    }
-    catch (const std::exception& e) {
-        Logger("PluginManager").error("Fehler bei der Plugin-ID-Generierung: {}", e.what());
-        return "";
-    }
-}
-
-void PluginManager::cleanupPlugin(PluginInfo& info) {
-    if (info.isInitialized && info.plugin) {
+    for (const auto& [name, plugin] : plugins) {
         try {
-            info.plugin->shutdown();
-        }
-        catch (const std::exception& e) {
-            Logger("PluginManager").error("Fehler beim Beenden des Plugins: {}", e.what());
-        }
-    }
-
-    if (info.handle) {
-        try {
-            dlclose(info.handle);
-        }
-        catch (const std::exception& e) {
-            Logger("PluginManager").error("Fehler beim Schließen des Plugin-Handles: {}", e.what());
+            plugin->update();
+        } catch (const std::exception& e) {
+            logger_.error("Fehler beim Update des Plugins {}: {}", name, e.what());
         }
     }
-
-    info.plugin.reset();
-    info.handle = nullptr;
-    info.isInitialized = false;
-}
-
-bool PluginManager::checkPluginCompatibility(const std::string& pluginPath) const {
-<<<<<<< HEAD
-=======
-    (void)pluginPath;
->>>>>>> 0dff1c4 (init 2)
-    // Hier können spezifische Kompatibilitätsprüfungen implementiert werden
-    // z.B. Überprüfung der Plugin-Version, API-Version, etc.
-    return true;
 }
 
 } // namespace VR_DAW 

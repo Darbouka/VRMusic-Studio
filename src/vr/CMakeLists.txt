@@ -1,114 +1,85 @@
+cmake_minimum_required(VERSION 3.15)
+
+# Find required packages
+find_package(GLEW REQUIRED)
+find_package(glm REQUIRED)
+find_package(glfw3 REQUIRED)
+
+# VR sources
 set(VR_SOURCES
-    VRManager.cpp
-    VRController.cpp
-    VRDisplay.cpp
+    VRIntegration.cpp
 )
 
-set(VR_HEADERS
-    VRManager.hpp
-    VRController.hpp
-    VRDisplay.hpp
-)
+# VR library
+add_library(VRMusicStudioVR STATIC ${VR_SOURCES})
 
-add_library(VR-DAW-VR-Lib STATIC ${VR_SOURCES} ${VR_HEADERS})
-
-target_include_directories(VR-DAW-VR-Lib
+target_include_directories(VRMusicStudioVR
     PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/../..
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
 )
 
-# OpenVR manuell suchen
-set(OPENVR_ROOT $ENV{HOME}/openvr)
-find_path(OPENVR_INCLUDE_DIR openvr.h PATHS ${OPENVR_ROOT}/headers)
-find_library(OPENVR_LIBRARY openvr_api PATHS ${OPENVR_ROOT}/lib/osx32)
-if(NOT OPENVR_INCLUDE_DIR OR NOT OPENVR_LIBRARY)
-    message(FATAL_ERROR "OpenVR nicht gefunden!")
-endif()
-include_directories(${OPENVR_INCLUDE_DIR})
-set(OPENVR_LIBRARIES ${OPENVR_LIBRARY})
-
-target_link_libraries(VR-DAW-VR-Lib
+target_link_libraries(VRMusicStudioVR
     PUBLIC
-        VR-DAW-Core
-        ${OPENVR_LIBRARIES}
-<<<<<<< HEAD
-        GLEW::GLEW
-=======
->>>>>>> 0dff1c4 (init 2)
-        glm::glm
+    VRMusicStudio::Core
+    VRMusicStudio::Audio
+    ${OPENVR_LIBRARIES}
+    ${OPENGL_LIBRARIES}
 )
 
-target_compile_features(VR-DAW-VR-Lib PRIVATE cxx_std_17)
-
-if(MSVC)
-    target_compile_options(VR-DAW-VR-Lib PRIVATE /W4)
-else()
-    target_compile_options(VR-DAW-VR-Lib PRIVATE -Wall -Wextra -Wpedantic)
-endif()
-
-add_library(VR-DAW-VR
-    VRManager.hpp
-    VRManager.cpp
-)
-
-target_include_directories(VR-DAW-VR
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}
-    PRIVATE
-        ${CMAKE_SOURCE_DIR}/src
-)
-
-target_link_libraries(VR-DAW-VR
-    PUBLIC
-        VR-DAW-Core
-        ${OPENVR_LIBRARIES}
-<<<<<<< HEAD
-        glm
-=======
-        glm::glm
->>>>>>> 0dff1c4 (init 2)
-)
-
-target_compile_definitions(VR-DAW-VR
-    PRIVATE
-        VR_DAW_VR_EXPORTS
-<<<<<<< HEAD
-=======
+install(TARGETS VRMusicStudioVR
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
 )
 
 # VR-Bibliothek
-add_library(VRMusicStudio::VR STATIC
+add_library(vr
+    VRDisplay.cpp
+    VRRenderer.cpp
     VREngine.cpp
+    VRManager.cpp
+    VRController.cpp
+    VRPhysics.cpp
+    VRAudio.cpp
+    VRUI.cpp
 )
 
-target_include_directories(VRMusicStudio::VR
+target_include_directories(vr
     PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include/vr
     PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/..
+        ${CMAKE_SOURCE_DIR}/src/vr
 )
 
-target_link_libraries(VRMusicStudio::VR
+target_link_libraries(vr
     PUBLIC
-        OpenVR::OpenVR
-        glfw
-        glm::glm
-        ImGui::ImGui
-    PRIVATE
+        core
         spdlog::spdlog
+        fmt::fmt
+        GLEW::GLEW
+        OpenGL::GL
 )
+
+target_compile_definitions(vr PRIVATE
+    VR_DAW_VR_EXPORTS
+)
+
+target_compile_features(vr PRIVATE cxx_std_17)
+
+if(MSVC)
+    target_compile_options(vr PRIVATE /W4)
+else()
+    target_compile_options(vr PRIVATE -Wall -Wextra -Wpedantic)
+endif()
 
 # Installationsregeln
-install(TARGETS VRMusicStudio::VR
+install(TARGETS vr
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
 )
 
 install(
     DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    DESTINATION include/VRMusicStudio/vr
+    DESTINATION include/vrmusicstudio/vr
     FILES_MATCHING PATTERN "*.hpp"
->>>>>>> 0dff1c4 (init 2)
 ) 

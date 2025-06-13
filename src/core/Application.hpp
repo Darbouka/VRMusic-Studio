@@ -1,59 +1,88 @@
 #pragma once
 
-#include <memory>
 #include <string>
+#include <memory>
+#include <chrono>
+#include <mutex>
+#include <condition_variable>
+#include "Logger.hpp"
+#include "EventSystem.hpp"
 #include <vector>
-#include <functional>
 
-namespace VR_DAW {
+namespace VRMusicStudio {
+namespace Core {
 
 class Application {
 public:
     static Application& getInstance();
 
+    Application(const Application&) = delete;
+    Application& operator=(const Application&) = delete;
+    Application(Application&&) = delete;
+    Application& operator=(Application&&) = delete;
+
     bool initialize();
     void shutdown();
     void run();
-    void stop();
-
-    // Event-System
-    using EventCallback = std::function<void(const std::string&)>;
-    void registerEventCallback(const std::string& eventName, EventCallback callback);
-    void unregisterEventCallback(const std::string& eventName, EventCallback callback);
-
+    void update();
+    static void handleSignal(int signal);
+    
     // Konfiguration
-    void loadConfig(const std::string& configPath);
-    void saveConfig(const std::string& configPath);
     void setConfigValue(const std::string& key, const std::string& value);
     std::string getConfigValue(const std::string& key) const;
-
+    
     // Plugin-Management
     bool loadPlugin(const std::string& pluginPath);
-    void unloadPlugin(const std::string& pluginId);
-    std::vector<std::string> getLoadedPlugins() const;
-
+    void unloadPlugin(const std::string& pluginName);
+    
     // Ressourcen-Management
     bool loadResource(const std::string& resourcePath);
-    void unloadResource(const std::string& resourceId);
-    std::vector<std::string> getLoadedResources() const;
+    void unloadResource(const std::string& resourceName);
+    
+    // Audio-Engine
+    void initializeAudioEngine();
+    void shutdownAudioEngine();
+    
+    // VR-Integration
+    void initializeVR();
+    void shutdownVR();
+    
+    // UI-Management
+    void initializeUI();
+    void shutdownUI();
+    
+    // Performance-Monitoring
+    void startPerformanceMonitoring();
+    void stopPerformanceMonitoring();
+    
+    // Error-Handling
+    void handleError(const std::string& errorMessage);
+    void setErrorCallback(std::function<void(const std::string&)> callback);
+
+    bool isRunning() const;
 
 private:
     Application();
     ~Application();
 
-    // Singleton-Pattern
-    Application(const Application&) = delete;
-    Application& operator=(const Application&) = delete;
+    void processEvents();
+    void updateComponents();
+    void render();
 
-    // Implementierungsdetails
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-
-    bool initialized;
     bool running;
-    std::string configPath;
-    std::vector<std::string> loadedPlugins;
-    std::vector<std::string> loadedResources;
+    std::chrono::steady_clock::time_point lastUpdateTime;
+    float deltaTime;
+
+    bool isRunning_;
+    bool shouldShutdown_;
+    std::chrono::steady_clock::time_point lastUpdateTime_;
+    std::chrono::milliseconds targetFrameTime_;
+    std::mutex mutex_;
+    std::condition_variable cv_;
+    Logger& logger_;
+    EventSystem& eventSystem_;
+    std::function<void(const std::string&)> errorCallback_;
 };
 
-} // namespace VR_DAW 
+} // namespace Core
+} // namespace VRMusicStudio 

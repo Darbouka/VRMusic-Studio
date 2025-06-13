@@ -1,133 +1,96 @@
-# VR-DAW (Virtual Reality Digital Audio Workstation)
+# VR Music Studio
 
-Eine moderne, leistungsstarke Digital Audio Workstation mit Virtual Reality-Unterstützung.
+Ein virtuelles Musikstudio für VR-Anwendungen.
 
-## Features
+## Voraussetzungen
 
-<<<<<<< HEAD
-- **3D-Audio-Verarbeitung**
-  - Raumklang-Unterstützung
-  - Binaurales Rendering
-  - Ambisonics-Integration
-
-- **VR-Integration**
-  - Natürliche Handgesten-Steuerung
-  - Immersive Benutzeroberfläche
-  - 3D-Visualisierung von Audio
-
-- **Audio-Engine**
-  - Echtzeit-Audio-Verarbeitung
-  - VST3/AU/AAX Plugin-Unterstützung
-  - Multi-Core-Verarbeitung
-  - GPU-Beschleunigung
-
-- **Benutzeroberfläche**
-  - Moderne, intuitive UI
-  - Anpassbare Layouts
-  - Touch- und Gestensteuerung
-
-## Systemanforderungen
-
-- **Betriebssystem**: macOS 10.15 oder höher
-- **CPU**: Intel Core i7 oder Apple Silicon
-- **RAM**: 16GB oder mehr
-- **GPU**: NVIDIA GTX 1060 oder höher
-- **VR-Headset**: Oculus Quest 2/Pro oder Valve Index
-=======
-* **3D-Audio-Verarbeitung**  
-   * Raumklang-Unterstützung  
-   * Binaurales Rendering  
-   * Ambisonics-Integration
-* **VR-Integration**  
-   * Natürliche Handgesten-Steuerung  
-   * Immersive Benutzeroberfläche  
-   * 3D-Visualisierung von Audio
-* **Audio-Engine**  
-   * Echtzeit-Audio-Verarbeitung  
-   * VST3/AU/AAX Plugin-Unterstützung  
-   * Multi-Core-Verarbeitung  
-   * GPU-Beschleunigung
-* **Benutzeroberfläche**  
-   * Moderne, intuitive UI  
-   * Anpassbare Layouts  
-   * Touch- und Gestensteuerung
-
-## Systemanforderungen
-
-* **Betriebssystem**: macOS 10.15 oder höher
-* **CPU**: Intel Core i7 oder Apple Silicon
-* **RAM**: 16GB oder mehr
-* **GPU**: NVIDIA GTX 1060 oder höher
-* **VR-Headset**: Oculus Quest 2/Pro oder Valve Index
->>>>>>> 0dff1c4 (init 2)
+- CMake 3.15 oder höher
+- C++17-kompatibler Compiler
+- Git
+- vcpkg (wird automatisch installiert)
 
 ## Installation
 
-```bash
-# Repository klonen
-git clone https://github.com/yourusername/VR-DAW-1.git
-cd VR-DAW-1
+### Automatische Installation
 
-# Build-Verzeichnis erstellen
-mkdir build && cd build
+1. Klonen Sie das Repository:
+   ```bash
+   git clone https://github.com/yourusername/vrmusicstudio.git
+   cd vrmusicstudio
+   ```
 
-# Projekt konfigurieren
-cmake ..
+2. Führen Sie das Installationsskript aus:
+   ```bash
+   chmod +x scripts/install_dependencies.sh
+   ./scripts/install_dependencies.sh
+   ```
 
-# Projekt bauen
-make -j4
-```
+3. Bauen Sie das Projekt:
+   ```bash
+   chmod +x scripts/build.sh
+   ./scripts/build.sh
+   ```
+
+### Manuelle Installation
+
+1. Installieren Sie vcpkg:
+   ```bash
+   git clone https://github.com/Microsoft/vcpkg.git
+   cd vcpkg
+   ./bootstrap-vcpkg.sh
+   ```
+
+2. Installieren Sie die Abhängigkeiten:
+   ```bash
+   ./vcpkg install spdlog:x64-osx
+   ./vcpkg install fmt:x64-osx
+   ./vcpkg install glew:x64-osx
+   ./vcpkg install glfw3:x64-osx
+   ./vcpkg install glm:x64-osx
+   ```
+
+3. Bauen Sie das Projekt:
+   ```bash
+   mkdir build && cd build
+   cmake .. -DCMAKE_TOOLCHAIN_FILE=../vcpkg/scripts/buildsystems/vcpkg.cmake
+   cmake --build .
+   ```
+
+### Docker-Installation
+
+1. Bauen Sie das Docker-Image:
+   ```bash
+   docker build -t vrmusicstudio .
+   ```
+
+2. Führen Sie den Container aus:
+   ```bash
+   docker run -it vrmusicstudio
+   ```
 
 ## Entwicklung
 
 ### Projektstruktur
 
 ```
-VR-DAW-1/
-├── src/                # Quellcode
-│   ├── core/          # Kernfunktionalitäten
-│   ├── audio/         # Audio-Verarbeitung
-│   ├── vr/            # VR-Komponenten
-│   ├── ui/            # Benutzeroberfläche
-│   └── utils/         # Hilfsfunktionen
-├── tests/             # Unit-Tests
-├── docs/              # Dokumentation
-└── build/             # Build-Verzeichnis
+vrmusicstudio/
+├── src/
+│   ├── core/      # Kernfunktionalität
+│   ├── audio/     # Audiokomponenten
+│   ├── vr/        # VR-spezifische Komponenten
+│   └── ui/        # Benutzeroberfläche
+├── include/       # Öffentliche Header
+├── tests/         # Unit-Tests
+└── scripts/       # Build- und Installationsskripte
 ```
 
-### Abhängigkeiten
+### Tests ausführen
 
-<<<<<<< HEAD
-- CMake 3.15+
-- C++17
-- OpenGL 4.1+
-- OpenVR
-- PortAudio
-- JUCE
-- GLM
-- GLEW
-- FreeType
-=======
-* CMake 3.15+
-* C++17
-* OpenGL 4.1+
-* OpenVR
-* PortAudio
-* JUCE
-* GLM
-* GLEW
-* FreeType
->>>>>>> 0dff1c4 (init 2)
+```bash
+cd build
+ctest --output-on-failure
+```
 
 ## Lizenz
 
-MIT License
-<<<<<<< HEAD
-
-## Kontakt
-
-Für Fragen und Anregungen:
-- E-Mail: your.email@example.com
-- GitHub Issues
-=======
->>>>>>> 0dff1c4 (init 2)
+Dieses Projekt ist unter der MIT-Lizenz lizenziert. Siehe [LICENSE](LICENSE) für Details.

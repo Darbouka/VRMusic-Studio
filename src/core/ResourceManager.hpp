@@ -1,103 +1,67 @@
 #pragma once
 
+#include "Logger.hpp"
 #include <string>
-#include <vector>
+#include <unordered_map>
 #include <memory>
 #include <mutex>
-#include <unordered_map>
-#include <any>
-#include <variant>
 #include <stdexcept>
+#include <vector>
 
-namespace VR_DAW {
+namespace VRMusicStudio {
+namespace Core {
+
+enum class ResourceType {
+    Unknown,
+    Image,
+    Audio,
+    Model
+};
+
+struct ResourceInfo {
+    std::string path;
+    ResourceType type;
+    std::vector<uint8_t> data;
+    bool isLoaded;
+    size_t size;
+};
 
 class ResourceException : public std::runtime_error {
 public:
-    explicit ResourceException(const std::string& message) : std::runtime_error(message) {}
+    explicit ResourceException(const std::string& message) 
+        : std::runtime_error(message) {}
 };
-
-class ResourceLoadException : public ResourceException {
-public:
-    explicit ResourceLoadException(const std::string& message) : ResourceException(message) {}
-};
-
-class ResourceTypeException : public ResourceException {
-public:
-    explicit ResourceTypeException(const std::string& message) : ResourceException(message) {}
-};
-
-struct AudioResource {
-    std::vector<float> samples;
-    int sampleRate;
-    int channels;
-    std::string format;
-};
-
-struct ImageResource {
-    std::vector<unsigned char> data;
-    int width;
-    int height;
-    int channels;
-    std::string format;
-};
-
-struct TextResource {
-    std::string content;
-    std::string encoding;
-};
-
-struct BinaryResource {
-    std::vector<unsigned char> data;
-    std::string type;
-};
-
-using ResourceData = std::variant<
-    AudioResource,
-    ImageResource,
-    TextResource,
-    BinaryResource
->;
 
 class ResourceManager {
 public:
+    static ResourceManager& getInstance();
+
+    ResourceManager(const ResourceManager&) = delete;
+    ResourceManager& operator=(const ResourceManager&) = delete;
+    ResourceManager(ResourceManager&&) = delete;
+    ResourceManager& operator=(ResourceManager&&) = delete;
+
+    bool initialize();
+    void shutdown();
+    void update();
+    bool loadResource(const std::string& resourcePath);
+    void unloadResource(const std::string& resourceName);
+    bool isResourceLoaded(const std::string& resourceId) const;
+    const ResourceInfo& getResourceInfo(const std::string& resourceId) const;
+
+private:
     ResourceManager();
     ~ResourceManager();
 
-    // Resource-Manager initialisieren/beenden
-    bool initialize();
-    void shutdown();
-
-    // Ressourcen laden/entladen
-    bool loadResource(const std::string& resourcePath);
-    void unloadResource(const std::string& resourceId);
+    bool validateResource(const std::string& resourcePath) const;
     void unloadAllResources();
+    void clear();
 
-    // Ressourcen-Informationen abrufen
-    std::vector<std::string> getLoadedResources() const;
-    ResourceData getResource(const std::string& resourceId) const;
-    bool isResourceLoaded(const std::string& resourceId) const;
-
-    // Resource-Manager aktualisieren
-    void update();
-
-private:
-    struct ResourceInfo {
-        ResourceData data;
-        std::string path;
-        std::string type;
-        size_t size;
-        bool isLoaded;
-    };
-
-    std::unordered_map<std::string, ResourceInfo> resources;
     mutable std::mutex mutex;
     bool initialized;
-
-    bool validateResource(const std::string& resourcePath) const;
-    std::string generateResourceId(const std::string& resourcePath) const;
-    ResourceData loadResourceData(const std::string& resourcePath) const;
-    void cleanupResource(ResourceInfo& info);
-    std::string determineResourceType(const std::string& resourcePath) const;
+    std::unordered_map<std::string, ResourceInfo> resources;
+    Logger& logger_;
 };
 
-} // namespace VR_DAW 
+} // namespace Core
+} // namespace VRMusicStudio 

@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <torch/torch.h>
 
-namespace VR_DAW {
+namespace VRMusicStudio {
 
 AIMasteringEngine::AIMasteringEngine() {
     initializeModels();
@@ -271,4 +271,4 @@ void AIMasteringEngine::optimizeForGenre() {
     // Implementiere Genre-basierte Optimierung
 }
 
-} // namespace VR_DAW 
+} // namespace VRMusicStudio 

@@ -1,72 +1,84 @@
 #pragma once
 
-#include <memory>
-#include <vector>
-#include <string>
-#include <mutex>
 #include <openvr.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
-#include "../core/Logger.hpp"
-#include "../core/EventSystem.hpp"
+#include <memory>
+#include <string>
+#include <vector>
+#include <mutex>
 
-namespace VR_DAW {
+namespace VRMusicStudio {
+namespace VR {
 
-struct VRDevice {
-    vr::TrackedDeviceIndex_t index;
-    std::string name;
+struct VRDeviceInfo {
+    vr::TrackedDeviceIndex_t deviceId;
+    std::string deviceName;
+    vr::ETrackedDeviceClass deviceClass;
     glm::vec3 position;
     glm::quat rotation;
     bool isConnected;
-    bool isTracking;
 };
 
 class VRManager {
 public:
     static VRManager& getInstance();
 
+    VRManager(const VRManager&) = delete;
+    VRManager& operator=(const VRManager&) = delete;
+    VRManager(VRManager&&) = delete;
+    VRManager& operator=(VRManager&&) = delete;
+
     bool initialize();
     void shutdown();
-    bool isInitialized() const;
+    void update();
 
-    // VR-System-Verwaltung
-    bool update();
-    void resetSeatedPosition();
-    
-    // Controller-Verwaltung
-    std::vector<VRDevice> getControllers() const;
-    bool isControllerConnected(vr::TrackedDeviceIndex_t controllerIndex) const;
-    glm::vec3 getControllerPosition(vr::TrackedDeviceIndex_t controllerIndex) const;
-    glm::quat getControllerRotation(vr::TrackedDeviceIndex_t controllerIndex) const;
-    
-    // HMD-Verwaltung
-    VRDevice getHMD() const;
+    bool isVRSystemActive() const;
+    bool isHMDConnected() const;
+    bool isControllerConnected(vr::ETrackedControllerRole role) const;
+
     glm::mat4 getHMDPose() const;
+    glm::mat4 getControllerPose(vr::ETrackedControllerRole role) const;
+    glm::vec3 getHMDPosition() const;
+    glm::quat getHMDRotation() const;
+
+    std::vector<VRDeviceInfo> getConnectedDevices() const;
+    VRDeviceInfo getDeviceInfo(vr::TrackedDeviceIndex_t deviceId) const;
+
+    void setTrackingSpace(vr::ETrackingUniverseOrigin origin);
+    vr::ETrackingUniverseOrigin getTrackingSpace() const;
+
+    void setRenderTargetSize(uint32_t width, uint32_t height);
+    void getRenderTargetSize(uint32_t& width, uint32_t& height) const;
+
+    void setIPD(float ipd);
+    float getIPD() const;
+
+    void setProjectionMatrix(vr::Hmd_Eye eye, float near, float far);
     glm::mat4 getProjectionMatrix(vr::Hmd_Eye eye) const;
-    glm::mat4 getEyeToHeadTransform(vr::Hmd_Eye eye) const;
-    
-    // Event-Handling
-    void processVREvents();
-    bool pollNextEvent(vr::VREvent_t& event);
+    glm::mat4 getEyeViewMatrix(vr::Hmd_Eye eye) const;
 
 private:
     VRManager();
     ~VRManager();
-    VRManager(const VRManager&) = delete;
-    VRManager& operator=(const VRManager&) = delete;
 
-    bool initializeOpenVR();
-    void shutdownOpenVR();
-    VRDevice createDeviceInfo(vr::TrackedDeviceIndex_t deviceIndex);
-    glm::mat4 convertSteamVRMatrixToMatrix4(const vr::HmdMatrix34_t& matPose);
-    glm::mat4 convertSteamVRMatrixToMatrix4(const vr::HmdMatrix44_t& mat);
+    void updateDevicePoses();
+    void updateHMDMatrixPose();
+    void updateControllerPoses();
 
-    vr::IVRSystem* vrSystem;
     bool initialized;
-    std::mutex mutex;
-    Logger logger;
-    std::vector<VRDevice> controllers;
-    VRDevice hmd;
+    vr::IVRSystem* vrSystem;
+    vr::ETrackingUniverseOrigin trackingSpace;
+    uint32_t renderWidth;
+    uint32_t renderHeight;
+    float ipd;
+
+    glm::mat4 hmdPose;
+    glm::mat4 controllerPoses[vr::k_unMaxTrackedDeviceCount];
+    std::vector<VRDeviceInfo> connectedDevices;
+
+    mutable std::mutex mutex;
 };
 
-} // namespace VR_DAW 
+} // namespace VR
+} // namespace VRMusicStudio 

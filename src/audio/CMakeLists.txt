@@ -1,112 +1,106 @@
-<<<<<<< HEAD
-set(AUDIO_SOURCES
-    AudioEngine.cpp
-    OpenALIntegration.cpp
-)
+# Effects-Modul Konfiguration
+file(GLOB_RECURSE EFFECT_SOURCES "*.cpp" "*.c")
 
-set(AUDIO_HEADERS
-    AudioEngine.hpp
-    OpenALIntegration.hpp
-)
+add_library(effects STATIC ${EFFECT_SOURCES})
 
-add_library(VR-DAW-Audio STATIC ${AUDIO_SOURCES} ${AUDIO_HEADERS})
-=======
-# Audio-Bibliothek
-add_library(VRMusicStudio::Audio STATIC
-    AudioEngine.cpp
-)
-
-target_include_directories(VRMusicStudio::Audio
+target_include_directories(effects
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/headers
     PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/..
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_link_libraries(VRMusicStudio::Audio
+target_link_libraries(effects
     PUBLIC
-        PortAudio::PortAudio
-        OpenAL::OpenAL
-        JUCE::juce_audio_basics
-        JUCE::juce_audio_devices
-        JUCE::juce_audio_formats
-        JUCE::juce_audio_processors
-        JUCE::juce_audio_utils
-    PRIVATE
-        spdlog::spdlog
+        audio
+        core
+        utils
 )
 
-# Installationsregeln
-install(TARGETS VRMusicStudio::Audio
-    LIBRARY DESTINATION lib
+# Installation
+install(TARGETS effects
     ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
 )
 
-install(
-    DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    DESTINATION include/VRMusicStudio/audio
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/headers/
+    DESTINATION include/effects
     FILES_MATCHING PATTERN "*.hpp"
 )
->>>>>>> 0dff1c4 (init 2)
 
-# OpenAL-Soft spezifische Pfade
-set(OPENAL_INCLUDE_DIR "/usr/local/opt/openal-soft/include")
-set(OPENAL_LIBRARY_DIR "/usr/local/opt/openal-soft/lib")
+# Audio-Bibliothek
+add_library(audio
+    AudioEngine.cpp
+    AudioProcessor.cpp
+    AudioPlugin.cpp
+    AudioTrack.cpp
+    OpenALIntegration.cpp
+    ProfessionalMixers.cpp
+    Synthesizers.cpp
+    Samplers.cpp
+    InstrumentModels.cpp
+    DrumMachine.cpp
+    VocoderEngine.cpp
+    VirtualRooms.cpp
+    InstrumentEngine.cpp
+    MixerEngine.cpp
+    EffectEngine.cpp
+    MidiTrack.cpp
+)
 
-<<<<<<< HEAD
-target_include_directories(VR-DAW-Audio
-=======
-target_include_directories(VRMusicStudio::Audio
->>>>>>> 0dff1c4 (init 2)
+target_include_directories(audio
     PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${OPENAL_INCLUDE_DIR}
+        ${CMAKE_SOURCE_DIR}/include/audio
     PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/../..
+        ${CMAKE_SOURCE_DIR}/src/audio
 )
 
-# OpenAL und SndFile finden
-find_package(OpenAL REQUIRED)
-find_package(SndFile REQUIRED)
-
-<<<<<<< HEAD
-target_link_libraries(VR-DAW-Audio
+target_link_libraries(audio
     PUBLIC
-        VR-DAW-Core
-        OpenAL::OpenAL
-        SndFile::sndfile
-        portaudio
-=======
-target_link_libraries(VRMusicStudio::Audio
+        core
+        spdlog::spdlog
+        fmt::fmt
+)
+
+# Audio components
+add_subdirectory(effects)
+add_subdirectory(instruments)
+add_subdirectory(processing)
+
+# Audio library
+add_library(VRMusicStudioAudio
+    AudioEngine.cpp
+    AudioProcessor.cpp
+    AudioTrack.cpp
+    MidiTrack.cpp
+    OpenALIntegration.cpp
+    VocoderEngine.cpp
+    PresetManager.cpp
+    Samplers.cpp
+    Synthesizers.cpp
+    InstrumentEngine.cpp
+)
+
+target_include_directories(VRMusicStudioAudio
     PUBLIC
-        VR-DAW-Core
->>>>>>> 0dff1c4 (init 2)
-        glm::glm
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
 )
 
-# Linker-Flags für OpenAL
-<<<<<<< HEAD
-target_link_directories(VR-DAW-Audio
-=======
-target_link_directories(VRMusicStudio::Audio
->>>>>>> 0dff1c4 (init 2)
-    PRIVATE
-        ${OPENAL_LIBRARY_DIR}
+target_link_libraries(VRMusicStudioAudio
+    PUBLIC
+    VRMusicStudio::Core
+    VRMusicStudio::Effects
+    VRMusicStudio::Instruments
+    VRMusicStudio::Processing
+    ${PORTAUDIO_LIBRARIES}
+    ${OPENAL_LIBRARIES}
+    ${FFTW3_LIBRARIES}
 )
 
-<<<<<<< HEAD
-target_compile_features(VR-DAW-Audio PRIVATE cxx_std_17)
-
-if(MSVC)
-    target_compile_options(VR-DAW-Audio PRIVATE /W4)
-else()
-    target_compile_options(VR-DAW-Audio PRIVATE -Wall -Wextra -Wpedantic)
-=======
-target_compile_features(VRMusicStudio::Audio PRIVATE cxx_std_17)
-
-if(MSVC)
-    target_compile_options(VRMusicStudio::Audio PRIVATE /W4)
-else()
-    target_compile_options(VRMusicStudio::Audio PRIVATE -Wall -Wextra -Wpedantic)
->>>>>>> 0dff1c4 (init 2)
-endif() 
+install(TARGETS VRMusicStudioAudio
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+) 

@@ -1,19 +1,29 @@
 #include "Application.hpp"
 #include "Logger.hpp"
-#include "Config.hpp"
-#include "PluginManager.hpp"
-#include "ResourceManager.hpp"
 #include "EventSystem.hpp"
+#include "audio/AudioEngine.hpp"
+#include "VRController.hpp"
+#include "VRManager.hpp"
+#include "ConfigManager.hpp"
+#include "PluginManager.hpp"
+#include "ProjectManager.hpp"
+#include "UIManager.hpp"
+#include "ResourceManager.hpp"
+#include "PerformanceMonitor.hpp"
+#include "ErrorHandler.hpp"
+#include "Version.hpp"
+#include <chrono>
+#include <thread>
+#include <memory>
+#include <stdexcept>
+#include <iostream>
+#include <csignal>
+#include <spdlog/spdlog.h>
 
-namespace VR_DAW {
+using namespace VRMusicStudio::Audio;
 
-struct Application::Impl {
-    std::unique_ptr<Logger> logger;
-    std::unique_ptr<Config> config;
-    std::unique_ptr<PluginManager> pluginManager;
-    std::unique_ptr<ResourceManager> resourceManager;
-    std::unique_ptr<EventSystem> eventSystem;
-};
+namespace VRMusicStudio {
+namespace Core {
 
 Application& Application::getInstance() {
     static Application instance;
@@ -21,212 +31,154 @@ Application& Application::getInstance() {
 }
 
 Application::Application()
-    : pImpl(std::make_unique<Impl>())
-    , initialized(false)
-    , running(false) {
+    : running(false)
+    , lastUpdateTime(std::chrono::steady_clock::now())
+    , deltaTime(0.0f) {
 }
 
-Application::~Application() = default;
+Application::~Application() {
+    shutdown();
+}
 
 bool Application::initialize() {
-    if (initialized) {
-        return true;
-    }
-
     try {
-        // Logger initialisieren
-        pImpl->logger = std::make_unique<Logger>("VR-DAW");
-        pImpl->logger->info("Initialisiere VR-DAW...");
+        auto& logger = Logger::getInstance();
+        logger.info("Initialisiere Anwendung...");
 
-        // Konfiguration laden
-        pImpl->config = std::make_unique<Config>();
-        if (!pImpl->config->load(configPath)) {
-            pImpl->logger->error("Fehler beim Laden der Konfiguration");
-            return false;
-        }
+        running = true;
+        lastUpdateTime = std::chrono::steady_clock::now();
+        deltaTime = 0.0f;
 
-        // Plugin-Manager initialisieren
-        pImpl->pluginManager = std::make_unique<PluginManager>();
-        if (!pImpl->pluginManager->initialize()) {
-            pImpl->logger->error("Fehler beim Initialisieren des Plugin-Managers");
-            return false;
-        }
-
-        // Ressourcen-Manager initialisieren
-        pImpl->resourceManager = std::make_unique<ResourceManager>();
-        if (!pImpl->resourceManager->initialize()) {
-            pImpl->logger->error("Fehler beim Initialisieren des Ressourcen-Managers");
-            return false;
-        }
-
-        // Event-System initialisieren
-        pImpl->eventSystem = std::make_unique<EventSystem>();
-        if (!pImpl->eventSystem->initialize()) {
-            pImpl->logger->error("Fehler beim Initialisieren des Event-Systems");
-            return false;
-        }
-
-        initialized = true;
-        pImpl->logger->info("VR-DAW erfolgreich initialisiert");
+        logger.info("Anwendung erfolgreich initialisiert");
         return true;
-    }
-    catch (const std::exception& e) {
-        if (pImpl->logger) {
-            pImpl->logger->error("Fehler bei der Initialisierung: {}", e.what());
-        }
+    } catch (const std::exception& e) {
+        spdlog::error("Fehler bei der Anwendungsinitialisierung: {}", e.what());
         return false;
     }
 }
 
 void Application::shutdown() {
-    if (!initialized) {
+    if (!running) {
         return;
     }
 
     try {
-        pImpl->logger->info("Beende VR-DAW...");
+        auto& logger = Logger::getInstance();
+        logger.info("Beende Anwendung...");
 
-        // Event-System beenden
-        if (pImpl->eventSystem) {
-            pImpl->eventSystem->shutdown();
-        }
-
-        // Ressourcen-Manager beenden
-        if (pImpl->resourceManager) {
-            pImpl->resourceManager->shutdown();
-        }
-
-        // Plugin-Manager beenden
-        if (pImpl->pluginManager) {
-            pImpl->pluginManager->shutdown();
-        }
-
-        // Konfiguration speichern
-        if (pImpl->config) {
-            pImpl->config->save(configPath);
-        }
-
-        initialized = false;
         running = false;
-        pImpl->logger->info("VR-DAW erfolgreich beendet");
-    }
-    catch (const std::exception& e) {
-        if (pImpl->logger) {
-            pImpl->logger->error("Fehler beim Beenden: {}", e.what());
-        }
+        logger.info("Anwendung erfolgreich beendet");
+    } catch (const std::exception& e) {
+        spdlog::error("Fehler beim Beenden der Anwendung: {}", e.what());
     }
 }
 
-void Application::run() {
-    if (!initialized || running) {
+void Application::update() {
+    if (!running) {
         return;
     }
 
-    running = true;
-    pImpl->logger->info("Starte VR-DAW Hauptschleife...");
-
     try {
-        while (running) {
-            // Event-System aktualisieren
-            pImpl->eventSystem->update();
+        // Berechne Delta-Zeit
+        auto currentTime = std::chrono::steady_clock::now();
+        deltaTime = std::chrono::duration<float>(currentTime - lastUpdateTime).count();
+        lastUpdateTime = currentTime;
 
-            // Plugin-Manager aktualisieren
-            pImpl->pluginManager->update();
-
-            // Ressourcen-Manager aktualisieren
-            pImpl->resourceManager->update();
-        }
-    }
-    catch (const std::exception& e) {
-        pImpl->logger->error("Fehler in der Hauptschleife: {}", e.what());
+        // Aktualisiere Komponenten
+        processEvents();
+        updateComponents();
+        render();
+    } catch (const std::exception& e) {
+        spdlog::error("Fehler im Update-Zyklus: {}", e.what());
         running = false;
     }
 }
 
-void Application::stop() {
-    running = false;
+bool Application::isRunning() const {
+    return running;
 }
 
-void Application::registerEventCallback(const std::string& eventName, EventCallback callback) {
-    if (pImpl->eventSystem) {
-        pImpl->eventSystem->registerCallback(eventName, callback);
+void Application::processEvents() {
+    // Event-Verarbeitung hier implementieren
+}
+
+void Application::updateComponents() {
+    // Komponenten-Update hier implementieren
+}
+
+void Application::render() {
+    // Rendering hier implementieren
+}
+
+void Application::handleSignal(int signal) {
+    if (signal == SIGINT || signal == SIGTERM) {
+        Application::getInstance().shutdown();
     }
 }
 
-void Application::unregisterEventCallback(const std::string& eventName, EventCallback callback) {
-    if (pImpl->eventSystem) {
-        pImpl->eventSystem->unregisterCallback(eventName, callback);
-    }
-}
-
-void Application::loadConfig(const std::string& configPath) {
-    this->configPath = configPath;
-    if (pImpl->config) {
-        pImpl->config->load(configPath);
-    }
-}
-
-void Application::saveConfig(const std::string& configPath) {
-    if (pImpl->config) {
-        pImpl->config->save(configPath);
-    }
-}
-
+// Konfigurations-Methoden
 void Application::setConfigValue(const std::string& key, const std::string& value) {
-    if (pImpl->config) {
-        pImpl->config->setValue(key, value);
-    }
+    ConfigManager::getInstance().setValue(key, value);
 }
 
 std::string Application::getConfigValue(const std::string& key) const {
-    if (pImpl->config) {
-<<<<<<< HEAD
-        return pImpl->config->getValue(key);
-=======
-        return pImpl->config->getValue(key, std::string());
->>>>>>> 0dff1c4 (init 2)
-    }
-    return "";
+    return ConfigManager::getInstance().getValue(key);
 }
 
+// Plugin-Management
 bool Application::loadPlugin(const std::string& pluginPath) {
-    if (pImpl->pluginManager) {
-        return pImpl->pluginManager->loadPlugin(pluginPath);
-    }
-    return false;
+    return PluginManager::getInstance().loadPlugin(pluginPath);
 }
 
-void Application::unloadPlugin(const std::string& pluginId) {
-    if (pImpl->pluginManager) {
-        pImpl->pluginManager->unloadPlugin(pluginId);
-    }
+void Application::unloadPlugin(const std::string& pluginName) {
+    PluginManager::getInstance().unloadPlugin(pluginName);
 }
 
-std::vector<std::string> Application::getLoadedPlugins() const {
-    if (pImpl->pluginManager) {
-        return pImpl->pluginManager->getLoadedPlugins();
-    }
-    return {};
-}
-
+// Ressourcen-Management
 bool Application::loadResource(const std::string& resourcePath) {
-    if (pImpl->resourceManager) {
-        return pImpl->resourceManager->loadResource(resourcePath);
-    }
-    return false;
+    return ResourceManager::getInstance().loadResource(resourcePath);
 }
 
-void Application::unloadResource(const std::string& resourceId) {
-    if (pImpl->resourceManager) {
-        pImpl->resourceManager->unloadResource(resourceId);
-    }
+void Application::unloadResource(const std::string& resourceName) {
+    ResourceManager::getInstance().unloadResource(resourceName);
 }
 
-std::vector<std::string> Application::getLoadedResources() const {
-    if (pImpl->resourceManager) {
-        return pImpl->resourceManager->getLoadedResources();
-    }
-    return {};
+// Audio-Engine
+void Application::initializeAudioEngine() {
+    AudioEngine::getInstance().initialize();
 }
 
-} // namespace VR_DAW 
+void Application::shutdownAudioEngine() {
+    AudioEngine::getInstance().shutdown();
+}
+
+// VR-Integration
+void Application::initializeVR() {
+    VRManager::getInstance().initialize();
+}
+
+void Application::shutdownVR() {
+    VRManager::getInstance().shutdown();
+}
+
+// UI-Management
+void Application::initializeUI() {
+    UIManager::getInstance().initialize();
+}
+
+void Application::shutdownUI() {
+    UIManager::getInstance().shutdown();
+}
+
+// Performance-Monitoring
+void Application::startPerformanceMonitoring() {
+    PerformanceMonitor::getInstance().start();
+}
+
+void Application::stopPerformanceMonitoring() {
+    PerformanceMonitor::getInstance().stop();
+}
+
+} // namespace Core
+} // namespace VRMusicStudio 
+} // namespace VRMusicStudio 
