@@ -1,12 +1,14 @@
-#include "VRInteraction.hpp"
+#include "vr/VRInteraction.hpp"
 #include "core/Logger.hpp"
 #include <algorithm>
+#include <glm/gtc/type_ptr.hpp>
 
 namespace VRMusicStudio {
 namespace VR {
 
-VRInteraction::VRInteraction(VRManager& vrManager)
-    : vrManager(vrManager)
+VRInteraction::VRInteraction()
+    : m_vrSystem(nullptr)
+    , m_isInitialized(false)
     , controllerPositions(2) // Maximal 2 Controller
     , controllerRotations(2)
     , hmdPosition(0.0f)
@@ -17,20 +19,27 @@ VRInteraction::VRInteraction(VRManager& vrManager)
     , hapticActive(2, false) {
 }
 
-VRInteraction::~VRInteraction() = default;
+VRInteraction::~VRInteraction() {
+    if (m_isInitialized) {
+        shutdown();
+    }
+}
 
 bool VRInteraction::initialize() {
     try {
         auto& logger = Core::Logger::getInstance();
-        logger.info("Initialisiere VR-Interaktionen...");
+        logger.info("Initialisiere VR-Interaktion...");
 
-        // Initialisiere Controller-Positionen und -Rotationen
-        for (size_t i = 0; i < controllerPositions.size(); ++i) {
-            controllerPositions[i] = glm::vec3(0.0f);
-            controllerRotations[i] = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+        vr::EVRInitError error = vr::VRInitError_None;
+        m_vrSystem = vr::VR_Init(&error, vr::VRApplication_Scene);
+
+        if (error != vr::VRInitError_None) {
+            logger.error("Fehler bei der VR-Initialisierung: {}", vr::VR_GetVRInitErrorAsEnglishDescription(error));
+            return false;
         }
 
-        logger.info("VR-Interaktionen erfolgreich initialisiert");
+        m_isInitialized = true;
+        logger.info("VR-Interaktion erfolgreich initialisiert");
         return true;
     } catch (const std::exception& e) {
         spdlog::error("Fehler bei der VR-Interaktions-Initialisierung: {}", e.what());
@@ -39,47 +48,58 @@ bool VRInteraction::initialize() {
 }
 
 void VRInteraction::shutdown() {
+    if (!m_isInitialized) {
+        return;
+    }
+
     try {
         auto& logger = Core::Logger::getInstance();
-        logger.info("Beende VR-Interaktionen...");
+        logger.info("Beende VR-Interaktion...");
 
-        // Stoppe alle haptischen Pulse
-        for (size_t i = 0; i < hapticActive.size(); ++i) {
-            if (hapticActive[i]) {
-                stopHapticPulse(i);
-            }
+        if (m_vrSystem) {
+            vr::VR_Shutdown();
+            m_vrSystem = nullptr;
         }
 
-        logger.info("VR-Interaktionen erfolgreich beendet");
+        m_isInitialized = false;
+        logger.info("VR-Interaktion erfolgreich beendet");
     } catch (const std::exception& e) {
-        spdlog::error("Fehler beim Beenden der VR-Interaktionen: {}", e.what());
+        spdlog::error("Fehler beim Beenden der VR-Interaktion: {}", e.what());
     }
 }
 
 void VRInteraction::update() {
-    // Aktualisiere Controller-Positionen und -Rotationen
-    for (size_t i = 0; i < controllerPositions.size(); ++i) {
-        if (isDeviceConnected(i)) {
-            controllerPositions[i] = getDevicePosition(i);
-            controllerRotations[i] = getDeviceRotation(i);
-        }
+    if (!m_isInitialized || !m_vrSystem) {
+        return;
     }
 
-    // Aktualisiere HMD-Position und -Rotation
-    hmdPosition = getDevicePosition(vr::k_unTrackedDeviceIndex_Hmd);
-    hmdRotation = getDeviceRotation(vr::k_unTrackedDeviceIndex_Hmd);
+    m_vrSystem->GetDeviceToAbsoluteTrackingPose(
+        vr::TrackingUniverseStanding,
+        0.0f,
+        m_trackedDevicePoses,
+        vr::k_unMaxTrackedDeviceCount
+    );
 }
 
-bool VRInteraction::isControllerButtonPressed(uint32_t controllerIndex, uint32_t button) {
-    if (controllerIndex >= controllerPositions.size()) {
+bool VRInteraction::isControllerButtonPressed(int controllerIndex, vr::EVRButtonId button) const {
+    if (!m_isInitialized || !m_vrSystem) {
+        return false;
+    }
+
+    vr::TrackedDeviceIndex_t deviceIndex = m_vrSystem->GetTrackedDeviceIndexForControllerRole(
+        controllerIndex == 0 ? vr::TrackedControllerRole_LeftHand : vr::TrackedControllerRole_RightHand
+    );
+
+    if (deviceIndex == vr::k_unTrackedDeviceIndexInvalid) {
         return false;
     }
 
     vr::VRControllerState_t state;
-    if (vrManager.getControllerState(controllerIndex, &state)) {
-        return (state.ulButtonPressed & (1ULL << button)) != 0;
+    if (!m_vrSystem->GetControllerState(deviceIndex, &state, sizeof(state))) {
+        return false;
     }
-    return false;
+
+    return (state.ulButtonPressed & vr::ButtonMaskFromId(button)) != 0;
 }
 
 bool VRInteraction::isControllerButtonTouched(uint32_t controllerIndex, uint32_t button) {
@@ -106,18 +126,53 @@ glm::vec2 VRInteraction::getControllerAxis(uint32_t controllerIndex, uint32_t ax
     return glm::vec2(0.0f);
 }
 
-glm::vec3 VRInteraction::getControllerPosition(uint32_t controllerIndex) {
-    if (controllerIndex >= controllerPositions.size()) {
+glm::vec3 VRInteraction::getControllerPosition(int controllerIndex) const {
+    if (!m_isInitialized || !m_vrSystem) {
         return glm::vec3(0.0f);
     }
-    return controllerPositions[controllerIndex];
+
+    vr::TrackedDeviceIndex_t deviceIndex = m_vrSystem->GetTrackedDeviceIndexForControllerRole(
+        controllerIndex == 0 ? vr::TrackedControllerRole_LeftHand : vr::TrackedControllerRole_RightHand
+    );
+
+    if (deviceIndex == vr::k_unTrackedDeviceIndexInvalid) {
+        return glm::vec3(0.0f);
+    }
+
+    const vr::TrackedDevicePose_t& pose = m_trackedDevicePoses[deviceIndex];
+    if (!pose.bPoseIsValid) {
+        return glm::vec3(0.0f);
+    }
+
+    const vr::HmdMatrix34_t& matrix = pose.mDeviceToAbsoluteTracking;
+    return glm::vec3(matrix.m[0][3], matrix.m[1][3], matrix.m[2][3]);
 }
 
-glm::quat VRInteraction::getControllerRotation(uint32_t controllerIndex) {
-    if (controllerIndex >= controllerRotations.size()) {
+glm::quat VRInteraction::getControllerRotation(int controllerIndex) const {
+    if (!m_isInitialized || !m_vrSystem) {
         return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
     }
-    return controllerRotations[controllerIndex];
+
+    vr::TrackedDeviceIndex_t deviceIndex = m_vrSystem->GetTrackedDeviceIndexForControllerRole(
+        controllerIndex == 0 ? vr::TrackedControllerRole_LeftHand : vr::TrackedControllerRole_RightHand
+    );
+
+    if (deviceIndex == vr::k_unTrackedDeviceIndexInvalid) {
+        return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    }
+
+    const vr::TrackedDevicePose_t& pose = m_trackedDevicePoses[deviceIndex];
+    if (!pose.bPoseIsValid) {
+        return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    }
+
+    const vr::HmdMatrix34_t& matrix = pose.mDeviceToAbsoluteTracking;
+    glm::mat3 rotationMatrix(
+        matrix.m[0][0], matrix.m[1][0], matrix.m[2][0],
+        matrix.m[0][1], matrix.m[1][1], matrix.m[2][1],
+        matrix.m[0][2], matrix.m[1][2], matrix.m[2][2]
+    );
+    return glm::quat_cast(rotationMatrix);
 }
 
 glm::vec3 VRInteraction::getHMDPosition() {

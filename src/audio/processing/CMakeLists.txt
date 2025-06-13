@@ -1,30 +1,46 @@
-# Processing sources
+# Verarbeitungs-Quellen
 set(PROCESSING_SOURCES
-    AudioProcessor.cpp
     EffectEngine.cpp
-    MasteringEngine.cpp
-    MixingEngine.cpp
+    AudioProcessor.cpp
+    BufferProcessor.cpp
+    StreamProcessor.cpp
+    DeviceProcessor.cpp
 )
 
-# Processing library
+# Verarbeitungs-Bibliothek
 add_library(VRMusicStudioProcessing STATIC ${PROCESSING_SOURCES})
 
-target_include_directories(VRMusicStudioProcessing
-    PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
+# Include-Verzeichnisse
+target_include_directories(VRMusicStudioProcessing PUBLIC
     ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src
 )
 
-target_link_libraries(VRMusicStudioProcessing
-    PUBLIC
-    VRMusicStudio::Core
-    VRMusicStudio::Audio
-    VRMusicStudio::Effects
-    ${FFTW3_LIBRARIES}
-    ${OPENAL_LIBRARIES}
+# Verlinke Bibliotheken
+target_link_libraries(VRMusicStudioProcessing PUBLIC
+    VRMusicStudioCore
+    VRMusicStudioEffects
 )
 
+# Kompilierungsoptionen
+target_compile_features(VRMusicStudioProcessing PRIVATE cxx_std_17)
+
+if(APPLE)
+    target_compile_options(VRMusicStudioProcessing PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Werror
+        -std=c++17
+        -arch arm64
+        -arch x86_64
+        -mmacosx-version-min=15.0
+    )
+endif()
+
+# Installationsregeln
 install(TARGETS VRMusicStudioProcessing
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
+    RUNTIME DESTINATION bin
 ) 

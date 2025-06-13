@@ -66,39 +66,53 @@ target_link_libraries(audio
 
 # Audio components
 add_subdirectory(effects)
-add_subdirectory(instruments)
 add_subdirectory(processing)
 
-# Audio library
-add_library(VRMusicStudioAudio
-    AudioEngine.cpp
-    AudioProcessor.cpp
-    AudioTrack.cpp
-    MidiTrack.cpp
-    OpenALIntegration.cpp
-    VocoderEngine.cpp
-    PresetManager.cpp
-    Samplers.cpp
-    Synthesizers.cpp
-    InstrumentEngine.cpp
+# Audio-Bibliothek
+set(AUDIO_SOURCES
+    AudioBuffer.cpp
+    AudioStream.cpp
+    effects/DistortionEffect.cpp
+    processing/AudioProcessor.cpp
 )
 
-target_include_directories(VRMusicStudioAudio
-    PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
+set(AUDIO_HEADERS
+    ${CMAKE_SOURCE_DIR}/include/audio/AudioBuffer.hpp
+    ${CMAKE_SOURCE_DIR}/include/audio/AudioStream.hpp
+    ${CMAKE_SOURCE_DIR}/include/audio/effects/DistortionEffect.hpp
+    ${CMAKE_SOURCE_DIR}/include/audio/processing/AudioProcessor.hpp
+)
+
+add_library(VRMusicStudioAudio STATIC
+    ${AUDIO_SOURCES}
+    ${AUDIO_HEADERS}
+)
+
+target_include_directories(VRMusicStudioAudio PUBLIC
     ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src
 )
 
-target_link_libraries(VRMusicStudioAudio
-    PUBLIC
-    VRMusicStudio::Core
-    VRMusicStudio::Effects
-    VRMusicStudio::Instruments
-    VRMusicStudio::Processing
-    ${PORTAUDIO_LIBRARIES}
-    ${OPENAL_LIBRARIES}
-    ${FFTW3_LIBRARIES}
+target_link_libraries(VRMusicStudioAudio PUBLIC
+    VRMusicStudioCore
+    PortAudio::PortAudio
+    spdlog::spdlog
 )
+
+target_compile_features(VRMusicStudioAudio PUBLIC cxx_std_17)
+
+if(APPLE)
+    target_compile_options(VRMusicStudioAudio PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Werror
+        -std=c++17
+        -arch arm64
+        -arch x86_64
+        -mmacosx-version-min=15.5
+    )
+endif()
 
 install(TARGETS VRMusicStudioAudio
     LIBRARY DESTINATION lib

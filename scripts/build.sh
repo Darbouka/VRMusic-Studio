@@ -1,37 +1,90 @@
 #!/bin/bash
 
+# Fehlerbehandlung
+set -e
+set -o pipefail
+
 # Farben für die Ausgabe
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# Funktion zum Überprüfen des Exit-Codes
-check_error() {
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Fehler: $1${NC}"
+# Hilfsfunktionen
+print_step() {
+    echo -e "${YELLOW}==>${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}==>${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}==>${NC} $1"
+}
+
+# Überprüfe Voraussetzungen
+check_requirements() {
+    print_step "Überprüfe Voraussetzungen..."
+    
+    # CMake
+    if ! command -v cmake &> /dev/null; then
+        print_error "CMake nicht gefunden. Bitte installieren Sie CMake."
+        exit 1
+    fi
+    
+    # Ninja
+    if ! command -v ninja &> /dev/null; then
+        print_error "Ninja nicht gefunden. Bitte installieren Sie Ninja."
+        exit 1
+    fi
+    
+    # vcpkg
+    if [ ! -d "vcpkg" ]; then
+        print_error "vcpkg nicht gefunden. Bitte klonen Sie das vcpkg Repository."
         exit 1
     fi
 }
 
-# Build-Verzeichnis erstellen
-echo -e "${YELLOW}Erstelle Build-Verzeichnis...${NC}"
-mkdir -p build
-cd build
+# Konfiguriere CMake
+configure_cmake() {
+    print_step "Konfiguriere CMake..."
+    
+    cmake -B build \
+        -S . \
+        -G Ninja \
+        -DCMAKE_BUILD_TYPE=Debug \
+        -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake \
+        -DCMAKE_OSX_DEPLOYMENT_TARGET=15.5 \
+        -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+        -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+}
 
-# CMake konfigurieren
-echo -e "${YELLOW}Konfiguriere CMake...${NC}"
-cmake .. -DCMAKE_BUILD_TYPE=Debug
-check_error "CMake-Konfiguration fehlgeschlagen"
+# Baue das Projekt
+build_project() {
+    print_step "Baue das Projekt..."
+    
+    cmake --build build --config Debug
+}
 
-# Projekt bauen
-echo -e "${YELLOW}Baue Projekt...${NC}"
-cmake --build . --config Debug
-check_error "Build fehlgeschlagen"
+# Führe Tests aus
+run_tests() {
+    print_step "Führe Tests aus..."
+    
+    cd build && ctest --output-on-failure
+}
 
-# Tests ausführen
-echo -e "${YELLOW}Führe Tests aus...${NC}"
-ctest --output-on-failure
-check_error "Tests fehlgeschlagen"
+# Hauptfunktion
+main() {
+    print_step "Starte Build-Prozess..."
+    
+    check_requirements
+    configure_cmake
+    build_project
+    run_tests
+    
+    print_success "Build erfolgreich abgeschlossen!"
+}
 
-echo -e "${GREEN}Build erfolgreich abgeschlossen!${NC}" 
+# Starte Hauptfunktion
+main 

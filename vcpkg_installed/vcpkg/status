@@ -12,6 +12,15 @@ Multi-Arch: same
 Abi: 16261c5dc4730b99a1f8c1f36a765df926cce47c7846de021cccfcadfaa3670b
 Status: install ok installed
 
+Package: fmt
+Version: 10.2.1
+Depends: vcpkg-cmake, vcpkg-cmake-config
+Architecture: x64-osx
+Multi-Arch: same
+Abi: 10dba3958ba53c561d86073aa6a4daa1568a84ca1d7f18084915db6213d501de
+Description: Formatting library for C++. It can be used as a safe alternative to printf or as a fast alternative to IOStreams.
+Status: install ok installed
+
 Package: glm
 Version: 1.0.1
 Port-Version: 3
@@ -22,32 +31,42 @@ Abi: 954df0f2038ef71e7a26e6c21dbd7ca50230486adb1df5182bb48f6630e7751e
 Description: OpenGL Mathematics (GLM)
 Status: install ok installed
 
-Package: nlohmann-json
-Version: 3.12.0
+Package: gtest
+Version: 1.17.0
+Port-Version: 1
 Depends: vcpkg-cmake, vcpkg-cmake-config
 Architecture: x64-osx
 Multi-Arch: same
-Abi: 5f8eaf21c4aed6a636e78c5c954ed663f96202286896f427c15bdc682290c7aa
-Description: JSON for Modern C++
+Abi: 40b7b865aad3e886ec9449de06ba22941c69463396d399f0ca1b62c2a0aea05e
+Description: Google Testing and Mocking Framework
 Status: install ok installed
 
-Package: openal-soft
-Version: 1.22.2
+Package: mpg123
+Version: 1.32.9
+Port-Version: 1
 Depends: vcpkg-cmake, vcpkg-cmake-config
 Architecture: x64-osx
 Multi-Arch: same
-Abi: 402a366eacaf884b4e68a1e77f0147b404d0d1efbee8209774f98032d9887331
-Description: OpenAL Soft is an LGPL-licensed, cross-platform, software implementation of the OpenAL 3D audio API.
+Abi: 9af5caef26a34e74c800ba78b997fb0e490bd0ac387be20e34924dbe9ce4b1ae
+Description: mpg123 is a real time MPEG 1.0/2.0/2.5 audio player/decoder for layers 1, 2 and 3 (MPEG 1.0 layer 3 also known as MP3).
 Status: install ok installed
 
-Package: portaudio
-Version: 19.7
-Port-Version: 7
+Package: mp3lame
+Version: 3.100
+Port-Version: 15
+Architecture: x64-osx
+Multi-Arch: same
+Abi: 6576f1ebef467f31661a88be396925c29a900962697900b4e474ad03eaaf3c3c
+Description: LAME is a high quality MPEG Audio Layer III (MP3) encoder licensed under the LGPL.
+Status: install ok installed
+
+Package: opus
+Version: 1.5.2
 Depends: vcpkg-cmake, vcpkg-cmake-config
 Architecture: x64-osx
 Multi-Arch: same
-Abi: 57a4e9bfd83c22e80442a31c6746ef9ee0367d59672f494476e178d20d506886
-Description: PortAudio Portable Cross-platform Audio I/O API PortAudio is a free, cross-platform, open-source, audio I/O library.  It lets you write simple audio programs in 'C' or C++ that will compile and run on many platforms including Windows, Macintosh OS X, and Unix (OSS/ALSA). It is intended to promote the exchange of audio software between developers on different platforms. Many applications use PortAudio for Audio I/O.
+Abi: 2924bbc590ef449b1bd4143dcf2ac1a41760c0e045d59c756822bb104584559e
+Description: Totally open, royalty-free, highly versatile audio codec
 Status: install ok installed
 
 Package: libogg
@@ -87,49 +106,49 @@ Multi-Arch: same
 Description: Build with stack smashing protection
 Status: install ok installed
 
-Package: sndfile
-Version: 1.0.29-cebfdf2-1
-Architecture: x64-osx
-Multi-Arch: same
-Abi: a85957337756a5b68263b3ff91905f9c5e78a16be63976ed052b81f958a17fd1
-Description: Library to read, write and manipulate many soundfile types. Authored by Eric de Castro Lopo
-Default-Features: external-libs
-Status: install ok installed
-
-Package: sndfile
-Feature: external-libs
-Depends: libflac, libogg, libvorbis
-Architecture: x64-osx
-Multi-Arch: same
-Description: Support Ogg Vorbis and FLAC audio files
-Status: install ok installed
-
-Package: fmt
-Version: 11.0.2
+Package: libsndfile
+Version: 1.2.2
 Port-Version: 1
 Depends: vcpkg-cmake, vcpkg-cmake-config
 Architecture: x64-osx
 Multi-Arch: same
-Abi: f339381ba68f13d2221624ecadaba62298264784cfe1318d64acf376cdebb05e
-Description: {fmt} is an open-source formatting library providing a fast and safe alternative to C stdio and C++ iostreams.
+Abi: 10436e51c706c1b0887cbe6a55a06b7ec55b4db672b8fc2d0dba476a45ec6e14
+Description: A library for reading and writing audio files
+Default-Features: external-libs, mpeg
 Status: install ok installed
 
-Package: spdlog
-Version: 1.15.3
+Package: libsndfile
+Feature: external-libs
+Depends: libflac, libvorbis, opus
+Architecture: x64-osx
+Multi-Arch: same
+Description: Enable FLAC, Vorbis, and Opus codecs
+Status: install ok installed
+
+Package: libsndfile
+Feature: mpeg
+Depends: mp3lame, mpg123
+Architecture: x64-osx
+Multi-Arch: same
+Description: Enable MPEG codecs
+Status: install ok installed
+
+Package: nlohmann-json
+Version: 3.12.0
+Depends: vcpkg-cmake, vcpkg-cmake-config
+Architecture: x64-osx
+Multi-Arch: same
+Abi: 5f8eaf21c4aed6a636e78c5c954ed663f96202286896f427c15bdc682290c7aa
+Description: JSON for Modern C++
+Status: install ok installed
+
+Package: openal-soft
+Version: 1.24.3
+Port-Version: 1
 Depends: fmt, vcpkg-cmake, vcpkg-cmake-config
 Architecture: x64-osx
 Multi-Arch: same
-Abi: b116c917717c73ff60144cca0f16b648b2d671cfcdefb0ced22a97aecfdb4041
-Description: Very fast, header-only/compiled, C++ logging library.
-Status: install ok installed
-
-Package: gtest
-Version: 1.17.0
-Port-Version: 1
-Depends: vcpkg-cmake, vcpkg-cmake-config
-Architecture: x64-osx
-Multi-Arch: same
-Abi: 40b7b865aad3e886ec9449de06ba22941c69463396d399f0ca1b62c2a0aea05e
-Description: Google Testing and Mocking Framework
+Abi: 6cf5c70c95290e165a51e7c6e44ae48c32016f7964a133a8ea7a5fa6498f3b4f
+Description: OpenAL Soft is an LGPL-licensed, cross-platform, software implementation of the OpenAL 3D audio API.
 Status: install ok installed
 

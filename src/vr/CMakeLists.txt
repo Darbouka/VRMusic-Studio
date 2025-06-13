@@ -7,25 +7,51 @@ find_package(glfw3 REQUIRED)
 
 # VR sources
 set(VR_SOURCES
-    VRIntegration.cpp
+    VRManager.cpp
+    VRDevice.cpp
+    VRController.cpp
+    VRHeadset.cpp
+)
+
+set(VR_HEADERS
+    ${CMAKE_SOURCE_DIR}/include/vr/VRManager.hpp
+    ${CMAKE_SOURCE_DIR}/include/vr/VRDevice.hpp
+    ${CMAKE_SOURCE_DIR}/include/vr/VRController.hpp
+    ${CMAKE_SOURCE_DIR}/include/vr/VRHeadset.hpp
 )
 
 # VR library
-add_library(VRMusicStudioVR STATIC ${VR_SOURCES})
+add_library(VRMusicStudioVR STATIC
+    ${VR_SOURCES}
+    ${VR_HEADERS}
+)
 
-target_include_directories(VRMusicStudioVR
-    PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
+target_include_directories(VRMusicStudioVR PUBLIC
     ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src
 )
 
-target_link_libraries(VRMusicStudioVR
-    PUBLIC
-    VRMusicStudio::Core
-    VRMusicStudio::Audio
-    ${OPENVR_LIBRARIES}
-    ${OPENGL_LIBRARIES}
+target_link_libraries(VRMusicStudioVR PUBLIC
+    VRMusicStudioCore
+    OpenGL::GL
+    GLEW::GLEW
+    Vulkan::Vulkan
 )
+
+target_compile_features(VRMusicStudioVR PUBLIC cxx_std_17)
+
+if(APPLE)
+    target_compile_options(VRMusicStudioVR PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Werror
+        -std=c++17
+        -arch arm64
+        -arch x86_64
+        -mmacosx-version-min=15.5
+    )
+endif()
 
 install(TARGETS VRMusicStudioVR
     LIBRARY DESTINATION lib

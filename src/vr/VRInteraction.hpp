@@ -1,63 +1,43 @@
 #pragma once
 
-#include "VRManager.hpp"
-#include <glm/glm.hpp>
-#include <glm/gtc/quaternion.hpp>
-#include <vector>
 #include <memory>
+#include <vector>
+#include <string>
+#include <glm/glm.hpp>
 
 namespace VRMusicStudio {
 namespace VR {
 
 class VRInteraction {
 public:
-    VRInteraction(VRManager& vrManager);
+    VRInteraction();
     ~VRInteraction();
 
+    // Initialisierung und Shutdown
     bool initialize();
     void shutdown();
-    void update();
 
     // Controller-Interaktionen
-    bool isControllerButtonPressed(uint32_t controllerIndex, uint32_t button);
-    bool isControllerButtonTouched(uint32_t controllerIndex, uint32_t button);
-    glm::vec2 getControllerAxis(uint32_t controllerIndex, uint32_t axis);
-    glm::vec3 getControllerPosition(uint32_t controllerIndex);
-    glm::quat getControllerRotation(uint32_t controllerIndex);
-
-    // HMD-Interaktionen
-    glm::vec3 getHMDPosition();
-    glm::quat getHMDRotation();
-    float getIPD();
-    void setIPD(float ipd);
-
-    // Tracking-Interaktionen
-    bool isDeviceConnected(uint32_t deviceIndex);
-    glm::vec3 getDevicePosition(uint32_t deviceIndex);
-    glm::quat getDeviceRotation(uint32_t deviceIndex);
-    void setDeviceTransform(uint32_t deviceIndex, const glm::vec3& position, const glm::quat& rotation);
+    glm::vec3 getControllerPosition(int controllerIndex) const;
+    glm::quat getControllerRotation(int controllerIndex) const;
+    bool isButtonPressed(int controllerIndex, int buttonId) const;
+    float getTriggerValue(int controllerIndex) const;
+    float getGripValue(int controllerIndex) const;
 
     // Raum-Interaktionen
+    void setRoomScale(bool enabled);
+    bool isRoomScaleEnabled() const;
     void setPlayAreaSize(float width, float length);
-    glm::vec2 getPlayAreaSize();
-    bool isPositionInPlayArea(const glm::vec3& position);
-    void setChaperoneVisibility(bool visible);
-    bool isChaperoneVisible();
+    glm::vec2 getPlayAreaSize() const;
 
-    // Haptisches Feedback
-    void triggerHapticPulse(uint32_t controllerIndex, float duration, float frequency, float amplitude);
-    void stopHapticPulse(uint32_t controllerIndex);
+    // Objekt-Interaktionen
+    bool grabObject(const std::string& objectId);
+    void releaseObject(const std::string& objectId);
+    bool isObjectGrabbed(const std::string& objectId) const;
 
 private:
-    VRManager& vrManager;
-    std::vector<glm::vec3> controllerPositions;
-    std::vector<glm::quat> controllerRotations;
-    glm::vec3 hmdPosition;
-    glm::quat hmdRotation;
-    float ipd;
-    glm::vec2 playAreaSize;
-    bool chaperoneVisible;
-    std::vector<bool> hapticActive;
+    class Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace VR

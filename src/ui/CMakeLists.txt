@@ -60,28 +60,55 @@ install(
 )
 
 set(UI_SOURCES
-    UIComponentBase.cpp
-    components/Button.cpp
-    components/Slider.cpp
-    components/Pad.cpp
-    components/StepSequencer.cpp
+    UIComponents.cpp
+    MainWindow.cpp
+    AudioWindow.cpp
+    MIDIWindow.cpp
+    VRWindow.cpp
 )
 
-add_library(VRMusicStudioUI STATIC ${UI_SOURCES})
-
-target_include_directories(VRMusicStudioUI
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_SOURCE_DIR}/include
+set(UI_HEADERS
+    ${CMAKE_SOURCE_DIR}/include/ui/UIComponents.hpp
+    ${CMAKE_SOURCE_DIR}/include/ui/MainWindow.hpp
+    ${CMAKE_SOURCE_DIR}/include/ui/AudioWindow.hpp
+    ${CMAKE_SOURCE_DIR}/include/ui/MIDIWindow.hpp
+    ${CMAKE_SOURCE_DIR}/include/ui/VRWindow.hpp
 )
 
-target_link_libraries(VRMusicStudioUI
-    PUBLIC
-        VRMusicStudio::Core
-        VRMusicStudio::VR
-        OpenGL::GL
-        glm::glm
+add_library(VRMusicStudioUI STATIC
+    ${UI_SOURCES}
+    ${UI_HEADERS}
 )
+
+target_include_directories(VRMusicStudioUI PUBLIC
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src
+)
+
+target_link_libraries(VRMusicStudioUI PUBLIC
+    VRMusicStudioCore
+    VRMusicStudioAudio
+    VRMusicStudioMIDI
+    VRMusicStudioVR
+    SDL2::SDL2
+    OpenGL::GL
+    GLEW::GLEW
+)
+
+target_compile_features(VRMusicStudioUI PUBLIC cxx_std_17)
+
+if(APPLE)
+    target_compile_options(VRMusicStudioUI PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Werror
+        -std=c++17
+        -arch arm64
+        -arch x86_64
+        -mmacosx-version-min=15.5
+    )
+endif()
 
 install(TARGETS VRMusicStudioUI
     LIBRARY DESTINATION lib

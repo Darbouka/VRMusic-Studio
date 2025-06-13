@@ -13,80 +13,60 @@ find_package(spdlog REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 
 # Define source files
-set(SOURCES
-    Application.cpp
-    EventSystem.cpp
+set(CORE_SOURCES
     Logger.cpp
-    ResourceManager.cpp
-    PluginManager.cpp
-    ProjectManager.cpp
-    UIManager.cpp
-    VRController.cpp
-    VRManager.cpp
-    ConfigManager.cpp
-    PerformanceMonitor.cpp
-    ErrorHandler.cpp
-    AudioEngine.cpp
-    Version.cpp
-    BackendService.cpp
-    SystemEngine.cpp
-    LoggingEngine.cpp
-    EventEngine.cpp
     Config.cpp
-    VRMusicStudioApp.cpp
+    ErrorHandler.cpp
 )
 
 # Define header files
-set(HEADERS
-    Logger.hpp
-    EventSystem.hpp
-    Application.hpp
-    ResourceManager.hpp
-    PluginManager.hpp
-    ProjectManager.hpp
-    UIManager.hpp
-    VRController.hpp
-    VRManager.hpp
-    ConfigManager.hpp
-    PerformanceMonitor.hpp
-    ErrorHandler.hpp
-    AudioEngine.hpp
-    Version.hpp
+set(CORE_HEADERS
+    ${CMAKE_SOURCE_DIR}/include/core/Logger.hpp
+    ${CMAKE_SOURCE_DIR}/include/core/Config.hpp
+    ${CMAKE_SOURCE_DIR}/include/core/ErrorHandler.hpp
 )
 
 # Create library
-add_library(core STATIC ${SOURCES} ${HEADERS})
+add_library(VRMusicStudioCore STATIC
+    ${CORE_SOURCES}
+    ${CORE_HEADERS}
+)
 
 # Set include directories
-target_include_directories(core PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${OPENAL_INCLUDE_DIR}
-    ${GLEW_INCLUDE_DIRS}
-    ${OPENGL_INCLUDE_DIR}
-    ${spdlog_INCLUDE_DIRS}
-    ${CMAKE_SOURCE_DIR}/src/core
+target_include_directories(VRMusicStudioCore PUBLIC
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src
 )
 
 # Link libraries
-target_link_libraries(core PUBLIC
-    OpenAL::OpenAL
-    GLEW::GLEW
-    OpenGL::GL
+target_link_libraries(VRMusicStudioCore PUBLIC
     spdlog::spdlog
     nlohmann_json::nlohmann_json
-    fmt::fmt
 )
 
 # Add compile definitions
-target_compile_definitions(core PRIVATE
+target_compile_definitions(VRMusicStudioCore PRIVATE
     SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG
 )
 
 # Specify compile features
-target_compile_features(core PRIVATE cxx_std_17)
+target_compile_features(VRMusicStudioCore PUBLIC cxx_std_17)
+
+if(APPLE)
+    target_compile_options(VRMusicStudioCore PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Werror
+        -std=c++17
+        -arch arm64
+        -arch x86_64
+        -mmacosx-version-min=15.5
+    )
+endif()
 
 # Installationsregeln
-install(TARGETS core
+install(TARGETS VRMusicStudioCore
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
 )

@@ -1,88 +1,90 @@
-# VR Music Studio
+# VRMusic Studio
 
-Ein virtuelles Musikstudio für VR-Anwendungen.
+Ein virtuelles Musikstudio für VR-Anwendungen, das sowohl unter macOS als auch Windows läuft.
+
+## Features
+
+- Cross-Platform Unterstützung (macOS & Windows)
+- DirectX 11 Integration für Windows
+- OpenGL/Vulkan Integration für macOS
+- JUCE Audio Engine
+- PortAudio Integration
+- Moderne UI mit DirectX/OpenGL Rendering
+- VR-Controller Unterstützung
 
 ## Voraussetzungen
 
-- CMake 3.15 oder höher
+### Allgemein
+- CMake 3.20 oder höher
 - C++17-kompatibler Compiler
 - Git
-- vcpkg (wird automatisch installiert)
+- vcpkg
+
+### macOS
+- Xcode Command Line Tools
+- Homebrew
+- Vulkan SDK
+
+### Windows
+- Visual Studio 2022 oder neuer
+- Windows SDK 10.0
+- DirectX SDK
 
 ## Installation
 
-### Automatische Installation
+### macOS
 
-1. Klonen Sie das Repository:
-   ```bash
-   git clone https://github.com/yourusername/vrmusicstudio.git
-   cd vrmusicstudio
-   ```
+1. Repository klonen:
+```bash
+git clone https://github.com/Darbouka/VRMusic-Studio.git
+cd VRMusic-Studio
+```
 
-2. Führen Sie das Installationsskript aus:
-   ```bash
-   chmod +x scripts/install_dependencies.sh
-   ./scripts/install_dependencies.sh
-   ```
+2. Abhängigkeiten installieren:
+```bash
+./scripts/install_dependencies.sh
+```
 
-3. Bauen Sie das Projekt:
-   ```bash
-   chmod +x scripts/build.sh
-   ./scripts/build.sh
-   ```
+3. Projekt bauen:
+```bash
+./scripts/build.sh
+```
 
-### Manuelle Installation
+### Windows
 
-1. Installieren Sie vcpkg:
-   ```bash
-   git clone https://github.com/Microsoft/vcpkg.git
-   cd vcpkg
-   ./bootstrap-vcpkg.sh
-   ```
+1. Repository klonen:
+```bash
+git clone https://github.com/Darbouka/VRMusic-Studio.git
+cd VRMusic-Studio
+```
 
-2. Installieren Sie die Abhängigkeiten:
-   ```bash
-   ./vcpkg install spdlog:x64-osx
-   ./vcpkg install fmt:x64-osx
-   ./vcpkg install glew:x64-osx
-   ./vcpkg install glfw3:x64-osx
-   ./vcpkg install glm:x64-osx
-   ```
+2. Abhängigkeiten installieren:
+```bash
+scripts\install_dependencies.bat
+```
 
-3. Bauen Sie das Projekt:
-   ```bash
-   mkdir build && cd build
-   cmake .. -DCMAKE_TOOLCHAIN_FILE=../vcpkg/scripts/buildsystems/vcpkg.cmake
-   cmake --build .
-   ```
+3. Projekt bauen:
+```bash
+scripts\build_windows.bat
+```
 
-### Docker-Installation
-
-1. Bauen Sie das Docker-Image:
-   ```bash
-   docker build -t vrmusicstudio .
-   ```
-
-2. Führen Sie den Container aus:
-   ```bash
-   docker run -it vrmusicstudio
-   ```
-
-## Entwicklung
-
-### Projektstruktur
+## Projektstruktur
 
 ```
-vrmusicstudio/
+VRMusic-Studio/
 ├── src/
 │   ├── core/      # Kernfunktionalität
 │   ├── audio/     # Audiokomponenten
 │   ├── vr/        # VR-spezifische Komponenten
 │   └── ui/        # Benutzeroberfläche
 ├── include/       # Öffentliche Header
+├── resources/     # Ressourcen (Icons, etc.)
+├── scripts/       # Build- und Installationsskripte
 ├── tests/         # Unit-Tests
-└── scripts/       # Build- und Installationsskripte
+└── external/      # Externe Abhängigkeiten
 ```
+
+## Entwicklung
 
 ### Tests ausführen
 
@@ -91,6 +93,23 @@ cd build
 ctest --output-on-failure
 ```
 
+### Code-Formatierung
+
+Das Projekt verwendet clang-format für die Code-Formatierung. Führen Sie vor dem Committen aus:
+
+```bash
+./scripts/format.sh
+```
+
 ## Lizenz
 
 Dieses Projekt ist unter der MIT-Lizenz lizenziert. Siehe [LICENSE](LICENSE) für Details.
+
+## Beitragen
+
+Beiträge sind willkommen! Bitte lesen Sie [CONTRIBUTING.md](CONTRIBUTING.md) für Details.
+
+## Kontakt
+
+- GitHub Issues: [Issues](https://github.com/Darbouka/VRMusic-Studio/issues)
+- E-Mail: [Ihre E-Mail]

@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Xcode
 #
 # gitignore contributors: remember to update Global/Xcode.gitignore, Objective-C.gitignore & Swift.gitignore
@@ -119,6 +118,7 @@ CMakeFiles/
 cmake_install.cmake
 Makefile
 *.cmake
+!CMakeLists.txt
 
 # Dependencies
 deps/
@@ -152,9 +152,18 @@ coverage/
 *.sf2
 *.sf3
 *.dll
-*.vst3 
-=======
-build
-codegen
-external
->>>>>>> 0dff1c4 (init 2)
+*.vst3
+
+# vcpkg
+vcpkg_installed/
+vcpkg/buildtrees/
+vcpkg/downloads/
+
+# macOS spezifisch
+.AppleDouble
+.LSOverride
+
+# Windows spezifisch
+Thumbs.db
+ehthumbs.db
+Desktop.ini

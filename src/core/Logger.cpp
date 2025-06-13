@@ -2,7 +2,15 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/rotating_file_sink.h>
+#if __has_include(<filesystem>)
 #include <filesystem>
+namespace fs = std::filesystem;
+#elif __has_include(<experimental/filesystem>)
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
+#else
+#error "No filesystem support found!"
+#endif
 #include <mutex>
 
 namespace VRMusicStudio {
@@ -23,7 +31,7 @@ Logger& Logger::getInstance() {
 Logger::Logger() {
     try {
         // Erstelle Logs-Verzeichnis
-        std::filesystem::create_directories(LOG_DIR);
+        fs::create_directories(LOG_DIR);
 
         // Konfiguriere Logger
         auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();

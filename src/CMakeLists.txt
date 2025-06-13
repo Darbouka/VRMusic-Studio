@@ -71,7 +71,7 @@ target_link_libraries(VRMusicStudio
     VRMusicStudio::Plugins
     VRMusicStudio::Sequencer
     VRMusicStudio::MIDI
-    VRMusicStudio::Network
+        VRMusicStudio::Network
     VRMusicStudio::Layout
     VRMusicStudio::Integration
     VRMusicStudio::Compatibility

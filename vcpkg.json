@@ -1,45 +1,74 @@
 {
     "name": "vrmusicstudio",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "dependencies": [
-        "spdlog",
-        "fmt",
-        "glew",
-        "glfw3",
-        "glm",
-        "sndfile",
-        "gtest",
-        "openvr",
-        "portaudio",
-        "jack2",
-        "vulkan",
-        "assimp",
-        "stb",
-        "nlohmann-json",
-        "websocketpp",
-        "boost"
-    ],
-    "builtin-baseline": "993c188a0e71002f6b6b959741d57fb8a2edf0ec",
-    "overrides": [
         {
-            "name": "spdlog",
-            "version": "1.12.0"
+            "name": "glm",
+            "version>=": "0.9.9.8"
         },
         {
-            "name": "fmt",
-            "version": "10.2.1"
+            "name": "glfw3",
+            "version>=": "3.3.8"
         },
         {
-            "name": "openvr",
-            "version": "1.23.7"
+            "name": "glew",
+            "version>=": "2.2.0"
+        },
+        {
+            "name": "vulkan",
+            "version>=": "1.3.268.0"
         },
         {
             "name": "portaudio",
-            "version": "19.7.0"
+            "version>=": "19.7.0"
         },
         {
-            "name": "jack2",
-            "version": "1.9.22"
+            "name": "spdlog",
+            "version>=": "1.12.0"
+        },
+        {
+            "name": "nlohmann-json",
+            "version>=": "3.11.2"
+        },
+        {
+            "name": "boost",
+            "version>=": "1.83.0"
+        },
+        {
+            "name": "gtest",
+            "version>=": "1.14.0"
+        },
+        {
+            "name": "directx-sdk",
+            "platform": "windows"
+        },
+        {
+            "name": "xinput",
+            "platform": "windows"
         }
-    ]
+    ],
+    "builtin-baseline": "f4ea42fa5c2b993cf2b75725331616999e2e34d1",
+    "overrides": [
+        {
+            "name": "vulkan",
+            "version": "1.3.268.0"
+        },
+        {
+            "name": "glew",
+            "version": "2.2.0#6"
+        },
+        {
+            "name": "glm",
+            "version": "1.0.1#3"
+        },
+        {
+            "name": "portaudio",
+            "version": "19.7#7"
+        }
+    ],
+    "features": {
+        "tools": {
+            "description": "Build with development tools"
+        }
+    }
 } 

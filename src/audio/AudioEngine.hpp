@@ -6,6 +6,7 @@
 #include <mutex>
 #include <portaudio.h>
 #include <jack/jack.h>
+#include <functional>
 
 namespace VRMusicStudio {
 namespace Audio {
@@ -41,6 +42,23 @@ public:
     std::vector<std::string> getAvailableInputDevices() const;
     std::vector<std::string> getAvailableOutputDevices() const;
 
+    // Audio-Stream-Management
+    bool createStream(const std::string& name, int sampleRate, int channels);
+    void destroyStream(const std::string& name);
+    
+    // Audio-Verarbeitung
+    void processAudio(float* buffer, int numFrames);
+    void setMasterVolume(float volume);
+    float getMasterVolume() const;
+
+    // Effekt-Management
+    bool addEffect(const std::string& streamName, const std::string& effectName);
+    void removeEffect(const std::string& streamName, const std::string& effectName);
+
+    // MIDI-Integration
+    bool handleMIDIEvent(const uint8_t* data, size_t length);
+    void setMIDICallback(std::function<void(const uint8_t*, size_t)> callback);
+
 private:
     AudioEngine();
     ~AudioEngine();
@@ -71,6 +89,9 @@ private:
     jack_port_t* jackOutputPort;
 
     mutable std::mutex mutex;
+
+    class Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace Audio

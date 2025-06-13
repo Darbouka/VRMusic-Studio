@@ -1,5 +1,8 @@
-#include "VRUI.hpp"
+#include "ui/VRUI.hpp"
 #include "core/Logger.hpp"
+#include "vr/VRInteraction.hpp"
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <algorithm>
 
 namespace VRMusicStudio {
@@ -61,8 +64,9 @@ void VRUI::update() {
         }
 
         // Berechne Cursor-Position relativ zum Panel
-        glm::vec3 localCursor = glm::inverse(glm::mat4_cast(panel->rotation)) * 
-                               (cursorPosition - panel->position);
+        glm::mat4 panelTransform = glm::translate(glm::mat4(1.0f), panel->position);
+        glm::mat4 inverseTransform = glm::inverse(panelTransform);
+        glm::vec4 localCursor = inverseTransform * glm::vec4(cursorPosition, 1.0f);
         
         // Prüfe, ob der Cursor über dem Panel ist
         panel->hovered = std::abs(localCursor.x) <= panel->size.x / 2.0f &&
@@ -70,7 +74,7 @@ void VRUI::update() {
 
         // Aktualisiere Klick-Status
         if (panel->hovered) {
-            panel->clicked = vrInteraction.isControllerButtonPressed(0, vr::k_EButton_SteamVR_Trigger);
+            panel->clicked = vrInteraction.isButtonPressed(0, 0); // 0 für Trigger-Button
         } else {
             panel->clicked = false;
         }

@@ -20,18 +20,20 @@ AudioEngine& AudioEngine::getInstance() {
 }
 
 AudioEngine::AudioEngine()
-    : isInitialized(false)
-    , isPlaying(false)
-    , currentPosition(0.0)
-    , stream(nullptr)
-    , sampleRate(44100.0)
-    , bufferSize(1024)
-    , inputDevice(-1)
-    , outputDevice(-1)
-    , paStream(nullptr)
-    , jackClient(nullptr)
-    , jackInputPort(nullptr)
-    , jackOutputPort(nullptr) {
+    : m_isInitialized(false)
+    , m_sampleRate(44100)
+    , m_blockSize(512)
+    , m_numChannels(2)
+    , m_audioStream(nullptr)
+    , m_isPlaying(false)
+    , m_currentPosition(0.0)
+    , m_stream(nullptr)
+    , m_inputDevice(-1)
+    , m_outputDevice(-1)
+    , m_paStream(nullptr)
+    , m_jackClient(nullptr)
+    , m_jackInputPort(nullptr)
+    , m_jackOutputPort(nullptr) {
     initialize();
 }
 
@@ -40,89 +42,83 @@ AudioEngine::~AudioEngine() {
 }
 
 bool AudioEngine::initialize() {
-    if (isInitialized) return true;
+    try {
+        auto& logger = Core::Logger::getInstance();
+        logger.info("Initialisiere Audio-Engine...");
 
-    PaError err = Pa_Initialize();
-    if (err != paNoError) {
-        throw std::runtime_error("Failed to initialize PortAudio: " + std::string(Pa_GetErrorText(err)));
+        // Audio-Stream initialisieren
+        m_audioStream = std::make_unique<AudioStream>();
+        if (!m_audioStream->initialize()) {
+            logger.error("Fehler bei der Audio-Stream-Initialisierung");
+            return false;
+        }
+
+        // Audio-Parameter setzen
+        m_audioStream->setSampleRate(m_sampleRate);
+        m_audioStream->setBlockSize(m_blockSize);
+        m_audioStream->setChannelCount(m_numChannels);
+
+        // Audio-Stream starten
+        if (!m_audioStream->start()) {
+            logger.error("Fehler beim Starten des Audio-Streams");
+            return false;
+        }
+
+        m_isInitialized = true;
+        logger.info("Audio-Engine erfolgreich initialisiert");
+        return true;
+    } catch (const std::exception& e) {
+        spdlog::error("Fehler bei der Audio-Engine-Initialisierung: {}", e.what());
+        return false;
     }
-
-    // Audio-Stream konfigurieren
-    PaStreamParameters inputParameters;
-    PaStreamParameters outputParameters;
-    
-    inputParameters.device = (inputDevice >= 0) ? inputDevice : Pa_GetDefaultInputDevice();
-    inputParameters.channelCount = 2;
-    inputParameters.sampleFormat = paFloat32;
-    inputParameters.suggestedLatency = Pa_GetDeviceInfo(inputParameters.device)->defaultLowInputLatency;
-    
-    outputParameters.device = (outputDevice >= 0) ? outputDevice : Pa_GetDefaultOutputDevice();
-    outputParameters.channelCount = 2;
-    outputParameters.sampleFormat = paFloat32;
-    outputParameters.suggestedLatency = Pa_GetDeviceInfo(outputParameters.device)->defaultLowOutputLatency;
-
-    // Stream öffnen
-    err = Pa_OpenStream(&stream,
-                       &inputParameters,
-                       &outputParameters,
-                       sampleRate,
-                       bufferSize,
-                       paClipOff | paDitherOff,
-                       nullptr,
-                       nullptr);
-
-    if (err != paNoError) {
-        throw std::runtime_error("Failed to open audio stream: " + std::string(Pa_GetErrorText(err)));
-    }
-
-    isInitialized = true;
-    return true;
 }
 
 void AudioEngine::shutdown() {
-    if (!isInitialized) return;
-
-    if (isPlaying) {
-        stop();
+    if (!m_isInitialized) {
+        return;
     }
 
-    PaError err = Pa_CloseStream(stream);
-    if (err != paNoError) {
-        throw std::runtime_error("Failed to close audio stream: " + std::string(Pa_GetErrorText(err)));
-    }
+    try {
+        auto& logger = Core::Logger::getInstance();
+        logger.info("Beende Audio-Engine...");
 
-    err = Pa_Terminate();
-    if (err != paNoError) {
-        throw std::runtime_error("Failed to terminate PortAudio: " + std::string(Pa_GetErrorText(err)));
-    }
+        if (m_audioStream) {
+            m_audioStream->stop();
+            m_audioStream->shutdown();
+            m_audioStream.reset();
+        }
 
-    isInitialized = false;
+        m_isInitialized = false;
+        logger.info("Audio-Engine erfolgreich beendet");
+    } catch (const std::exception& e) {
+        spdlog::error("Fehler beim Beenden der Audio-Engine: {}", e.what());
+    }
 }
 
 void AudioEngine::start() {
-    if (!isInitialized || isPlaying) return;
+    if (!m_isInitialized || m_isPlaying) return;
 
-    PaError err = Pa_StartStream(stream);
+    PaError err = Pa_StartStream(m_stream);
     if (err != paNoError) {
         throw std::runtime_error("Failed to start audio stream: " + std::string(Pa_GetErrorText(err)));
     }
 
-    isPlaying = true;
+    m_isPlaying = true;
 }
 
 void AudioEngine::stop() {
-    if (!isInitialized || !isPlaying) return;
+    if (!m_isInitialized || !m_isPlaying) return;
 
-    PaError err = Pa_StopStream(stream);
+    PaError err = Pa_StopStream(m_stream);
     if (err != paNoError) {
         throw std::runtime_error("Failed to stop audio stream: " + std::string(Pa_GetErrorText(err)));
     }
 
-    isPlaying = false;
+    m_isPlaying = false;
 }
 
 void AudioEngine::processAudio(float* inputBuffer, float* outputBuffer, unsigned long framesPerBuffer) {
-    if (!isInitialized) return;
+    if (!m_isInitialized) return;
 
     // Audio-Verarbeitung für alle Tracks
     for (auto& track : audioTracks) {
@@ -192,7 +188,7 @@ void AudioEngine::processVRAudio(float* outputBuffer, unsigned long framesPerBuf
 void AudioEngine::processAutomation(unsigned long framesPerBuffer) {
     // Automation-Punkte verarbeiten
     for (auto& [parameter, points] : automationPoints) {
-        float currentTime = currentPosition;
+        float currentTime = m_currentPosition;
         float value = interpolateAutomationValue(points, currentTime);
         setParameter(parameter, value);
     }
@@ -263,62 +259,79 @@ glm::vec3 AudioEngine::getSourcePosition() const {
 }
 
 void AudioEngine::update() {
-    std::lock_guard<std::mutex> lock(mutex);
-
-    if (!isInitialized || !isPlaying) {
+    if (!m_isInitialized || !m_audioStream) {
         return;
     }
 
-    try {
-        // Audio-Update-Logik hier implementieren
-    } catch (const std::exception& e) {
-        spdlog::error("Fehler im Audio-Update: {}", e.what());
+    // Audio-Buffer verarbeiten
+    AudioBuffer buffer(m_numChannels, m_blockSize);
+    m_audioStream->process(buffer);
+
+    // Audio-Effekte anwenden
+    for (auto& effect : m_effects) {
+        effect->process(buffer);
     }
+
+    // Audio an Output weiterleiten
+    m_audioStream->write(buffer);
 }
 
 bool AudioEngine::isStreamActive() const {
     std::lock_guard<std::mutex> lock(mutex);
-    return isPlaying;
+    return m_isPlaying;
 }
 
-void AudioEngine::setSampleRate(double newSampleRate) {
-    std::lock_guard<std::mutex> lock(mutex);
-    sampleRate = newSampleRate;
+void AudioEngine::setSampleRate(int sampleRate) {
+    m_sampleRate = sampleRate;
+    if (m_audioStream) {
+        m_audioStream->setSampleRate(sampleRate);
+    }
 }
 
-double AudioEngine::getSampleRate() const {
-    std::lock_guard<std::mutex> lock(mutex);
-    return sampleRate;
+int AudioEngine::getSampleRate() const {
+    return m_sampleRate;
 }
 
-void AudioEngine::setBufferSize(unsigned int newBufferSize) {
-    std::lock_guard<std::mutex> lock(mutex);
-    bufferSize = newBufferSize;
+void AudioEngine::setBlockSize(int blockSize) {
+    m_blockSize = blockSize;
+    if (m_audioStream) {
+        m_audioStream->setBlockSize(blockSize);
+    }
 }
 
-unsigned int AudioEngine::getBufferSize() const {
-    std::lock_guard<std::mutex> lock(mutex);
-    return bufferSize;
+int AudioEngine::getBlockSize() const {
+    return m_blockSize;
+}
+
+void AudioEngine::setChannelCount(int numChannels) {
+    m_numChannels = numChannels;
+    if (m_audioStream) {
+        m_audioStream->setChannelCount(numChannels);
+    }
+}
+
+int AudioEngine::getChannelCount() const {
+    return m_numChannels;
 }
 
 void AudioEngine::setInputDevice(int deviceId) {
     std::lock_guard<std::mutex> lock(mutex);
-    inputDevice = deviceId;
+    m_inputDevice = deviceId;
 }
 
 void AudioEngine::setOutputDevice(int deviceId) {
     std::lock_guard<std::mutex> lock(mutex);
-    outputDevice = deviceId;
+    m_outputDevice = deviceId;
 }
 
 int AudioEngine::getInputDevice() const {
     std::lock_guard<std::mutex> lock(mutex);
-    return inputDevice;
+    return m_inputDevice;
 }
 
 int AudioEngine::getOutputDevice() const {
     std::lock_guard<std::mutex> lock(mutex);
-    return outputDevice;
+    return m_outputDevice;
 }
 
 std::vector<std::string> AudioEngine::getAvailableInputDevices() const {
@@ -394,23 +407,23 @@ void AudioEngine::initializePortAudio() {
     PaStreamParameters inputParameters;
     PaStreamParameters outputParameters;
 
-    inputParameters.device = (inputDevice >= 0) ? inputDevice : Pa_GetDefaultInputDevice();
+    inputParameters.device = (m_inputDevice >= 0) ? m_inputDevice : Pa_GetDefaultInputDevice();
     inputParameters.channelCount = 2;
     inputParameters.sampleFormat = paFloat32;
     inputParameters.suggestedLatency = Pa_GetDeviceInfo(inputParameters.device)->defaultLowInputLatency;
     inputParameters.hostApiSpecificStreamInfo = nullptr;
 
-    outputParameters.device = (outputDevice >= 0) ? outputDevice : Pa_GetDefaultOutputDevice();
+    outputParameters.device = (m_outputDevice >= 0) ? m_outputDevice : Pa_GetDefaultOutputDevice();
     outputParameters.channelCount = 2;
     outputParameters.sampleFormat = paFloat32;
     outputParameters.suggestedLatency = Pa_GetDeviceInfo(outputParameters.device)->defaultLowOutputLatency;
     outputParameters.hostApiSpecificStreamInfo = nullptr;
 
-    err = Pa_OpenStream(&paStream,
+    err = Pa_OpenStream(&m_paStream,
                        &inputParameters,
                        &outputParameters,
-                       sampleRate,
-                       bufferSize,
+                       m_sampleRate,
+                       m_blockSize,
                        paClipOff,
                        paCallback,
                        this);
@@ -421,39 +434,52 @@ void AudioEngine::initializePortAudio() {
 }
 
 void AudioEngine::initializeJACK() {
-    jackClient = jack_client_open("VRMusicStudio", JackNoStartServer, nullptr);
-    if (!jackClient) {
+    m_jackClient = jack_client_open("VRMusicStudio", JackNoStartServer, nullptr);
+    if (!m_jackClient) {
         throw std::runtime_error("Fehler beim Öffnen des JACK-Clients");
     }
 
-    jack_set_process_callback(jackClient, jackCallback, this);
+    jack_set_process_callback(m_jackClient, jackCallback, this);
 
-    jackInputPort = jack_port_register(jackClient, "input", JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
-    jackOutputPort = jack_port_register(jackClient, "output", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+    m_jackInputPort = jack_port_register(m_jackClient, "input", JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
+    m_jackOutputPort = jack_port_register(m_jackClient, "output", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
 
-    if (!jackInputPort || !jackOutputPort) {
+    if (!m_jackInputPort || !m_jackOutputPort) {
         throw std::runtime_error("Fehler bei der JACK-Port-Registrierung");
     }
 
-    if (jack_activate(jackClient) != 0) {
+    if (jack_activate(m_jackClient) != 0) {
         throw std::runtime_error("Fehler bei der JACK-Client-Aktivierung");
     }
 }
 
 void AudioEngine::shutdownPortAudio() {
-    if (paStream) {
-        Pa_CloseStream(paStream);
-        paStream = nullptr;
+    if (m_paStream) {
+        Pa_CloseStream(m_paStream);
+        m_paStream = nullptr;
     }
     Pa_Terminate();
 }
 
 void AudioEngine::shutdownJACK() {
-    if (jackClient) {
-        jack_client_close(jackClient);
-        jackClient = nullptr;
-        jackInputPort = nullptr;
-        jackOutputPort = nullptr;
+    if (m_jackClient) {
+        jack_client_close(m_jackClient);
+        m_jackClient = nullptr;
+        m_jackInputPort = nullptr;
+        m_jackOutputPort = nullptr;
+    }
+}
+
+void AudioEngine::addEffect(std::shared_ptr<AudioEffect> effect) {
+    if (effect) {
+        effects.push_back(effect);
+    }
+}
+
+void AudioEngine::removeEffect(std::shared_ptr<AudioEffect> effect) {
+    auto it = std::find(effects.begin(), effects.end(), effect);
+    if (it != effects.end()) {
+        effects.erase(it);
     }
 }
 
